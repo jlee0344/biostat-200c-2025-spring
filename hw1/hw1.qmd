@@ -32,6 +32,7 @@ library(knitr)
 library(tidyverse)
 library(faraway)
 library(gridExtra)
+library(splines)
 ```
 
 To submit homework, please submit Rmd and html files to bruinlearn by the deadline.
@@ -46,18 +47,57 @@ An initial data analysis that explores the numerical and graphical characteristi
 
 **Solution ** 
 
+The swiss data set is a data frame with 47 observations of 6 variables: Fertility (numeric), Agriculture (numeric), Examination (integer), Education (integer), Catholic (numeric), and Infant Mortality (numeric). 
+
 ```{r}
 data(swiss)
-View(swiss)
 ```
+
+```{r}
+str(swiss)
+```
+The summary statistics (minimum, 1st quartile, median, mean 3rd quartile, and maximum) of the variables in the swiss dataset are as follows: 
+
+```{r}
+summary(swiss)
+```
+
+Data Visualization Plots: Univariate 
+
+```{r}
+ggplot()
+```
+
+
+Data Visualization: Multivariable Relationships 
+
+```{r}
+
+```
+
+Data Visualization: Factor Plot 
+```{r}
+
+```
+
+
+Data Visualization: Correlation Plots
+```{r}
+
+```
+
 
 ### Q1.2
 
 Variable selection to choose the best model. (10pts)
 
 **Solution ** 
-```{r}
 
+```{r}
+blmodi <- lm(Fertility ~ Agriculture + Examination + Education + Catholic + Infant.Mortality, data = swiss)
+par(mfrow = c(1,2))
+termplot(lmodi, partial.resid = TRUE, terms = 2) 
+termplot(blmodi, partial.resid = TRUE, terms = 2) 
 ```
 
 ### Q1.3
@@ -74,6 +114,11 @@ An exploration of transformations to improve the fit of the model. (10pts)
 Diagnostics to check the assumptions of your model. (10pts)
 
 **Solution ** 
+We conduct Regression Diagnostics. We recall that the assumptions of the linear model: 
+1. Y depends on the covariates in X linearly: E(Y) = XB or E(e) = 0. We use the residual-fitted valu plot, scale location plot, and residual-leverae plto to check for this: 
+
+2. Errors are iid with common variance. We use the QQ plot to check the normality assumption.
+
 ```{r}
 
 ```
@@ -155,6 +200,7 @@ missing.glm %>%
   bold_labels() %>%
   bold_p(t = 0.05)
 ```
+
 From above regression, we found missingness was not associate with outcome. This means that the distribution of outcome when removing data with missing is still a representative of the original distribution. This justifies the use of "complete case" analysis. 
 
 ### Q2.7 
@@ -164,3 +210,9 @@ Using the last fitted model of the previous question, what is the difference in 
 ### Q2.8 
 
 Do women who test positive have higher diastolic blood pressures? Is the diastolic blood pressure significant in the regression model? Explain the distinction between the two questions and discuss why the answers are only apparently contradictory. (10pts)
+
+
+
+
+
+
