@@ -264,48 +264,64 @@ Creating the interleaved histogram plot: Amongst the Pima Indians who tested neg
 ### Q2.3
 
 Replace the incredible zeroes in other variables with the missing value code. Fit a model with the result of the diabetes test as the response and all the other variables as predictors. How many observations were used in the model fitting? Why is this less than the number of observations in the data frame. (10pts)
-
-
-  pregnant         glucose        diastolic         triceps         insulin            bmi           diabetes     
- Min.   : 0.000   Min.   :  0.0   Min.   :  0.00   Min.   : 0.00   Min.   : 14.00   Min.   : 0.00   Min.   :0.0780  
- 1st Qu.: 1.000   1st Qu.: 99.0   1st Qu.: 62.00   1st Qu.: 0.00   1st Qu.: 76.25   1st Qu.:27.30   1st Qu.:0.2437  
- Median : 3.000   Median :117.0   Median : 72.00   Median :23.00   Median :125.00   Median :32.00   Median :0.3725  
- Mean   : 3.845   Mean   :120.9   Mean   : 69.11   Mean   :20.54   Mean   :155.55   Mean   :31.99   Mean   :0.4719  
- 3rd Qu.: 6.000   3rd Qu.:140.2   3rd Qu.: 80.00   3rd Qu.:32.00   3rd Qu.:190.00   3rd Qu.:36.60   3rd Qu.:0.6262  
- Max.   :17.000   Max.   :199.0   Max.   :122.00   Max.   :99.00   Max.   :846.00   Max.   :67.10   Max.   :2.4200  
-                                                                   NA's   :374                                      
-      age              test    
- Min.   :21.00   Negative:500  
- 1st Qu.:24.00   Positive:268  
- Median :29.00                 
- Mean   :33.24                 
- 3rd Qu.:41.00                 
- Max.   :81.00                 
  
 **Solution ** 
-We are able to see the results of the code: summary(pima) that all the following predictor variables have entries "0" as the minimum: pregnant, glucose, diastolic, triceps, and bmi. 
+We observe from the output of summary(pima) that several predictor variables have a minimum value of 0, specifically: glucose, diastolic, triceps, insulin, and bmi. These values are medically implausible and likely represent missing data, so we will convert them to N/A. However, we will not convert the 0 values in the pregnant variable, as it is perfectly reasonable for individuals in the dataset to have had zero pregnancies and is therefore not indicative of missing data. 
 
 ```{r}
-variables <- c("glucose", "diastolic", "triceps", "insulin", "bmi", "diabetes")
+summary(pima)
+variables <- c("glucose", "diastolic", "triceps", "bmi") 
 pima[variables] <- lapply(pima[variables], function(x) ifelse(x == 0, NA, x))
 ```
 
+```{r}
+pima_clean <- na.omit(pima)
+nrow(pima_clean)
+
+model_first <- glm(test ~ ., data = pima_clean, family = binomial)
+model_first
+```
+The number of observations used in the model fitting is 392. This is fewer than the 768 observations in the original data frame because we removed all rows containing missing values in the predictor variables. The original dataset included rows with invalid zero values in variables such as glucose, diastolic, triceps, insulin, and bmi, which are not physiologically realistic. These zeroes were replaced with NA, and the rows containing them were excluded during model fitting to ensure data quality.
 
 ### Q2.4
 
 Refit the model but now without the insulin and triceps predictors. How many observations were used in fitting this model? Devise a test to compare this model with that in the previous question. (10pts)
 
 ```{r}
-
+model_second <- glm(test ~ . -insulin -triceps, data = pima_clean, family = binomial)
+model_second 
+nrow(model.frame(model_second))
 ```
+We refit the model without the insulin and triceps predictors. The number of observations used in fitting this model is 392, the same as in the previous model, since we are using the same cleaned dataset (pima_clean) with all missing values already removed. The only difference is that this model excludes the insulin and triceps variables as predictors.
 
+Test to compare this model to the previous model (that included insulin and triceps): We use the likelihood ratio test to compare the two models. The likelihood ratio test compares the goodness of fit of two models and checks whether removing the two predictors - insulin and triceps significantly worsens the model's fit where the null hypothesis is that the reduced model fits the data just as well as the full model. The p-value is 0.6507 (larger than 0.05) so we fail to reject the null hypothesis. Therefore, we have sufficient evidence to conclude the reduced model (without the 2 predictors insulin and triceps) fits the data just as well as the full model and do not significantly contribute to the model when the other predictors are already included in the model. 
+
+```{r}
+anova(model_second, model_first, test = "Chisq")
+```
 
 ### Q2.5
 
 Use AIC to select a model. You will need to take account of the missing values. Which predictors are selected? How many cases are used in your selected model? (10pts)
 
-```{r}
+**Solution ** 
 
+We perform step-wise selection, adding or dropping predictors to minimize the AIC. We start with the full model that contains all the predictors (pregnant, glucose, diastolic, tricpes, insulin, bmi, diabetes, and age) after removing all the rows that contain NA values. The model selection process of AIC balances the goodness of fit (how well the model explains the data) and the model complexity (penalizes the number of predictors). The lower the AIC, the better the model. Once we start with the full model, we iteratively add or remove predictors (both forward seelctin and backward elimination). 
+
+```{r}
+variables <- c("glucose", "diastolic", "triceps", "insulin", "bmi")
+pima[variables] <- lapply(pima[variables], function(x) ifelse(x == 0, NA, x))
+pima_clean <- na.omit(pima)
+full_model <- glm(test ~ ., data = pima_clean, family = binomial)
+full_model 
+
+selected_model <- step(full_model, direction = "both")
+```
+
+The model with the lowest AIC value comes out to be the one with the following variables: pregnant + glucose + bmi + diabetes + age. Therefore the best model is represented as: 
+
+```{r}
+summary(selected_model) 
 ```
 
 
@@ -314,7 +330,7 @@ Use AIC to select a model. You will need to take account of the missing values. 
 Create a variable that indicates whether the case contains a missing value. Use this variable as a predictor of the test result. Is missingness associated with the test result? Refit the selected model, but now using as much of the data as reasonable. Explain why it is appropriate to do this. (10pts)
 
 ```{r}
-
+pima$misssing 
 ```
 
 From above regression, we found missingness was not associate with outcome. This means that the distribution of outcome when removing data with missing is still a representative of the original distribution. This justifies the use of "complete case" analysis. 
@@ -323,10 +339,16 @@ From above regression, we found missingness was not associate with outcome. This
 
 Using the last fitted model of the previous question, what is the difference in the odds of testing positive for diabetes for a woman with a BMI at the first quartile compared with a woman at the third quartile, assuming that all other factors are held constant? Give a confidence interval for this difference.(10pts)
 
+
+**Solution ** 
+
 ```{r}
 
 ```
 
+The difference in the odds of testing positive for diabetes for a woman with a BMI at the first quartile compared wiht a woman at the third quartile, assumign hat all other factors are held constant 
+
+The confidence interval for this difference is 
 
 ### Q2.8 
 
