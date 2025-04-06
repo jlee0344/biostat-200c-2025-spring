@@ -33,6 +33,7 @@ library(tidyverse)
 library(faraway)
 library(gridExtra)
 library(splines)
+library(mlbench)
 ```
 
 To submit homework, please submit Rmd and html files to bruinlearn by the deadline.
@@ -46,11 +47,18 @@ The swiss data — use Fertility as the response to practice
 An initial data analysis that explores the numerical and graphical characteristics of the data.(5pts)
 
 **Solution ** 
+According to online sources, the Swiss Fertility and Socioeconomic Indicators dataset represent the standardized fertility measure and socioeconomic indicators for each of the 47 French-speaking provinces in Switzerland, dated in 1888. 
 
-The swiss data set is a data frame with 47 observations of 6 variables: Fertility (numeric), Agriculture (numeric), Examination (integer), Education (integer), Catholic (numeric), and Infant Mortality (numeric). 
+The swiss data set is a data frame with 47 observations of 6 variables: Fertility (numeric), Agriculture (numeric), Examination (integer), Education (integer), Catholic (numeric), and Infant Mortality (numeric). The variables are represented as follows: 1. Fertility (commmon fertility measure in Ig), 2. Agriculture (percentage of males involved in agriculture as occupation), 3. Examination (percentages of draftees receiving highest mark on army examination), 4. Education (percentage eduation beyond primary school for draftees), 5. Catholic (percent of catholics as opposed to protestants), 6. Infant Mortality (live births who live less than 1 year). 
 
 ```{r}
 data(swiss)
+```
+
+```{r}
+swiss <- swiss %>% 
+  as_tibble(rownames = "Provinces") %>%
+  print(width = Inf)
 ```
 
 ```{r}
@@ -59,27 +67,75 @@ str(swiss)
 The summary statistics (minimum, 1st quartile, median, mean 3rd quartile, and maximum) of the variables in the swiss dataset are as follows: 
 
 ```{r}
-summary(swiss)
+summary(swiss) 
 ```
 
 Data Visualization Plots: Univariate 
 
+1. Univariate plot of the Fertility Variable: 
 ```{r}
-ggplot()
+ggplot(swiss, aes(x = Fertility)) +
+  geom_histogram(aes(y = ..density..), bins = 20, fill = "skyblue", color = "black", alpha = 0.6) +
+  geom_density(color = "darkblue", linewidth = 1) +
+  labs(
+    title = "Histogram of Fertility Rates in Swiss Provinces",
+    x = "Fertility Rate",
+    y = "Density"
+  ) +
+  theme_minimal()
+
+unique(swiss$Examination)
 ```
 
-
-Data Visualization: Multivariable Relationships 
-
+2. Boxplots for the Predictor Variables: 
 ```{r}
+# Select only predictor variables
+predictor_vars <- c("Agriculture", "Examination", "Education", "Catholic", "Infant.Mortality")
 
+# Reshape to long format
+swiss_long <- swiss %>%
+  pivot_longer(cols = all_of(predictor_vars), names_to = "Variable", values_to = "Value")
+
+# Faceted boxplot
+ggplot(swiss_long, aes(x = "", y = Value)) +
+  geom_boxplot(fill = "lightgreen") +
+  facet_wrap(~ Variable, scales = "free_y") +
+  labs(title = "Boxplots of Predictor Variables in the Swiss Dataset", x = "", y = "") +
+  theme_minimal()
+```
+```{r}
+# 3. Density plots for all variables including Fertility
+swiss_long <- swiss %>%
+  pivot_longer(cols = -Provinces, names_to = "Variable", values_to = "Value")
+
+ggplot(swiss_long, aes(x = Value)) +
+  geom_density(fill = "lightblue", alpha = 0.5) +
+  facet_wrap(~ Variable, scales = "free", ncol = 2) +
+  labs(title = "Density Plots of Swiss Dataset Variables")
 ```
 
-Data Visualization: Factor Plot 
+Data Visualization: Multivariable Relationships
+
+We will create several scatter plots between 2 variables because all 6 variables are continuous. 
+
 ```{r}
-
+ggplot(swiss_long, aes(x = Value, y = Fertility)) +
+  geom_point(color = "steelblue", size = 2) +
+  geom_smooth(method = "loess", se = TRUE, fill = "gray", color = "darkred", size = 1) +
+  facet_wrap(~ Predictor, scales = "free_x", strip.position = "bottom") +
+  labs(
+    title = "Fertility vs Predictor Variables (Loess Curves + Uncertainty)",
+    x = "Predictor Value",
+    y = "Fertility"
+  ) +
+  theme_minimal() +
+  theme(
+    strip.placement = "outside",              
+    strip.background = element_blank(),      
+    axis.title.x = element_text(margin = margin(t = 10)),
+    axis.text.x = element_text(angle = 0)    
+  )
 ```
-
 
 Data Visualization: Correlation Plots
 ```{r}
@@ -151,54 +207,114 @@ An interpretation of the meaning of the model by writing a scientific abstract. 
 
 The National Institute of Diabetes and Digestive and Kidney Diseases conducted a study on 768 adult female Pima Indians living near Phoenix. The purpose of the study was to investigate factors related to diabetes. The data may be found in the the dataset `pima`.
 
+```{r}
+data(pima)
+str(pima)
+summary(pima)
+```
+
 ### Q2.1 
 
 Create a factor version of the test results and use this to produce an interleaved histogram to show how the distribution of insulin differs between those testing positive and negative. Do you notice anything unbelievable about the plot? (5pts)
 
+**Solution **
+
+```{r}
+pima$test <- factor(pima$test, levels = c(0,1), labels = c("Negative", "Positive"))
+```
+
+Producing an Interleaved Histogram: 
+
+```{r}
+ggplot(pima, aes(x = insulin, fill = test)) +
+  geom_histogram(position = "identity", alpha = 0.5, bins = 30) +
+  labs( 
+    title = "Insulin Levels by Test Result",
+    x = "Insulin",
+    y = "Count",
+    fill = "Test Result"
+  ) +
+  theme_minimal()
+```
+
+Abnormalities of the graph: The histogram displays a large concentration of insulin values at 0, which is highly improbable for human insulin levels. This anomaly likely indicates missing or unrecorded measurements that were incorrectly entered as zero, rather than representing true physiological data. Additionally, the graph reveals the presence of extreme outliers, with some insulin values exceeding 750. Such values are not biologically plausible and may be the result of data entry errors or measurement inaccuracies. 
 
 ### Q2.2
 
-Replace the zero values of `insulin` with the missing value code `NA`. Recreatethe interleaved histogram plot and comment on the distribution. (5pts)
+Replace the zero values of `insulin` with the missing value code `NA`. Recreate the interleaved histogram plot and comment on the distribution. (5pts)
+
+```{r}
+pima$insulin <- ifelse(pima$insulin == 0, NA, pima$insulin)
+```
+
+```{r}
+ggplot(pima, aes(x = insulin, fill = test)) +
+  geom_histogram(position = "identity", alpha = 0.5, bins = 30, na.rm = TRUE) +
+  labs(
+    title = "Insulin Levels by Test Result (After removing all NA values)",
+    x = "Insulin Level",
+    y = "Count",
+    fill = "Test Result"
+  ) +
+  theme_minimal()
+```
+
+Creating the interleaved histogram plot: Amongst the Pima Indians who tested negative (pink), the majority of individuals have insulin levels clustered between 0-150. There is a peak at around insulin levels of 100-125. In addition, the distribution of insulin levels is right skewed where there are fewer people with higher insulin levels. There are a couple of outliers of individuals whose insulin levels are above 300. Amongst the Pima Indians who tested positive (blue), the majority of individuals have insulin levels clustered between 100-250. The distribution is more spread out compard to the distribution corresponding to the inuslin levels of the Pima Indians who tested negative. Compared to the negative group, the positive group has a longer right tail, which suggests that some individuals who tested positive have very high insulin levels of above 500. 
 
 ### Q2.3
 
 Replace the incredible zeroes in other variables with the missing value code. Fit a model with the result of the diabetes test as the response and all the other variables as predictors. How many observations were used in the model fitting? Why is this less than the number of observations in the data frame. (10pts)
 
+
+  pregnant         glucose        diastolic         triceps         insulin            bmi           diabetes     
+ Min.   : 0.000   Min.   :  0.0   Min.   :  0.00   Min.   : 0.00   Min.   : 14.00   Min.   : 0.00   Min.   :0.0780  
+ 1st Qu.: 1.000   1st Qu.: 99.0   1st Qu.: 62.00   1st Qu.: 0.00   1st Qu.: 76.25   1st Qu.:27.30   1st Qu.:0.2437  
+ Median : 3.000   Median :117.0   Median : 72.00   Median :23.00   Median :125.00   Median :32.00   Median :0.3725  
+ Mean   : 3.845   Mean   :120.9   Mean   : 69.11   Mean   :20.54   Mean   :155.55   Mean   :31.99   Mean   :0.4719  
+ 3rd Qu.: 6.000   3rd Qu.:140.2   3rd Qu.: 80.00   3rd Qu.:32.00   3rd Qu.:190.00   3rd Qu.:36.60   3rd Qu.:0.6262  
+ Max.   :17.000   Max.   :199.0   Max.   :122.00   Max.   :99.00   Max.   :846.00   Max.   :67.10   Max.   :2.4200  
+                                                                   NA's   :374                                      
+      age              test    
+ Min.   :21.00   Negative:500  
+ 1st Qu.:24.00   Positive:268  
+ Median :29.00                 
+ Mean   :33.24                 
+ 3rd Qu.:41.00                 
+ Max.   :81.00                 
+ 
+**Solution ** 
+We are able to see the results of the code: summary(pima) that all the following predictor variables have entries "0" as the minimum: pregnant, glucose, diastolic, triceps, and bmi. 
+
+```{r}
+variables <- c("glucose", "diastolic", "triceps", "insulin", "bmi", "diabetes")
+pima[variables] <- lapply(pima[variables], function(x) ifelse(x == 0, NA, x))
+```
+
+
 ### Q2.4
 
 Refit the model but now without the insulin and triceps predictors. How many observations were used in fitting this model? Devise a test to compare this model with that in the previous question. (10pts)
 
+```{r}
+
+```
+
+
 ### Q2.5
 
 Use AIC to select a model. You will need to take account of the missing values. Which predictors are selected? How many cases are used in your selected model? (10pts)
+
+```{r}
+
+```
+
 
 ### Q2.6
 
 Create a variable that indicates whether the case contains a missing value. Use this variable as a predictor of the test result. Is missingness associated with the test result? Refit the selected model, but now using as much of the data as reasonable. Explain why it is appropriate to do this. (10pts)
 
 ```{r}
-library(faraway)
-library(tidyverse)
 
-pima <- pima %>% 
-  mutate(
-    glucose2  = ifelse(glucose == 0, NA, glucose),
-    diastolic2 = ifelse(diastolic == 0, NA, diastolic),
-    triceps2 = ifelse(triceps == 0, NA, triceps),
-    insulin2 = ifelse(insulin == 0, NA, insulin),
-    bmi2 = ifelse(bmi == 0, NA, bmi), 
-    diabetes2 = ifelse(diabetes == 0, NA, diabetes),
-    age2 = ifelse(age == 0, NA, age))
-
-pima$missingNA = ifelse(apply(is.na(dplyr::select(pima, contains("2"))), 1, sum) > 0, 1, 0)
-
-missing.glm <- glm(test ~ missingNA, family = binomial(), data = pima)
-
-library(gtsummary)
-missing.glm %>%
-  tbl_regression() %>%
-  bold_labels() %>%
-  bold_p(t = 0.05)
 ```
 
 From above regression, we found missingness was not associate with outcome. This means that the distribution of outcome when removing data with missing is still a representative of the original distribution. This justifies the use of "complete case" analysis. 
@@ -207,9 +323,17 @@ From above regression, we found missingness was not associate with outcome. This
 
 Using the last fitted model of the previous question, what is the difference in the odds of testing positive for diabetes for a woman with a BMI at the first quartile compared with a woman at the third quartile, assuming that all other factors are held constant? Give a confidence interval for this difference.(10pts)
 
+```{r}
+
+```
+
+
 ### Q2.8 
 
 Do women who test positive have higher diastolic blood pressures? Is the diastolic blood pressure significant in the regression model? Explain the distinction between the two questions and discuss why the answers are only apparently contradictory. (10pts)
+```{r}
+
+```
 
 
 
