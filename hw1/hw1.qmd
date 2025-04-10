@@ -37,7 +37,14 @@ library(mlbench)
 library(lmtest)
 library(mice)
 library(MASS)
+library(ggplot2)
+library(tidyr)
+library(dplyr) 
+library(corrplot)
+library(ggplot2)
+
 ```
+
 
 To submit homework, please submit Rmd and html files to bruinlearn by the deadline.
 
@@ -90,16 +97,14 @@ ggplot(swiss, aes(x = Fertility)) +
 
 2. Boxplots for the Predictor Variables: 
 
-The boxplots show the distribution of the predictor variables (Agriculture, Catholic, Education, Examination, and Infant Mortality) in the swiss dataset. Brief summary of the boxplots: 1. Agriculture: The median percentage of males involved in agriculture as occupation lies around 
+The boxplots show the distribution of the predictor variables (Agriculture, Catholic, Education, Examination, and Infant Mortality) in the swiss dataset. Brief summary of the boxplots: 1. Agriculture: The median percentage of males involved in agriculture as occupation lies between 50-60 percent, the distribution is moderately spread out, and there no clear outliers. 2. Catholic: The distribution for the percent of catholics as opposed to protestants is severely right skewed (positve skewed), the spread is extremely wide, and there are no visible outliers. This indicates that most of the provinces have a small percentage of Catholics. 3. Education: The percentage education beyond primary school for draftees is slightly right skewed (positive skewed), the median is low (between 0 and 10), there are a few notable outliers in the distribution (greater than 30) but the spread of the percentages is narrow. 4. Examination: The distribution for the percentage of draftees receiving highest marks on army examinations is slightly skewed to the right (positively skewed) with no strong outliers and the median is near the lower end of the IQR. 5. Infant Mortality: The distribution that represents the number of live births who live less than 1 year is fairly symmetrical with a slightly longer upper whisker, the range is narrow, ad the median is around 20. 
 
 ```{r}
 predictor_vars <- c("Agriculture", "Examination", "Education", "Catholic", "Infant.Mortality")
 
-# Reshape to long format
 swiss_long <- swiss %>%
   pivot_longer(cols = all_of(predictor_vars), names_to = "Variable", values_to = "Value")
 
-# Faceted boxplot
 ggplot(swiss_long, aes(x = "", y = Value)) +
   geom_boxplot(fill = "lightgreen") +
   facet_wrap(~ Variable, scales = "free_y") +
@@ -108,7 +113,7 @@ ggplot(swiss_long, aes(x = "", y = Value)) +
 ```
 3. Density plots for all variables including Fertility
 
-For better visualization of the distributions of all the predictor variables and the response variable, Fertility, we plot the density plots. 
+For better visualization of the distributions of all the predictor variables and the response variable, Fertility, we plot the density plots. The distributions reflect the same characterisitics as the histograms above. 
 
 ```{r}
 swiss_long <- swiss %>%
@@ -120,46 +125,104 @@ ggplot(swiss_long, aes(x = Value)) +
   labs(title = "Density Plots of Swiss Dataset Variables")
 ```
 
-Data Visualization: Multivariable Relationships
+Data Visualization: Multivariable Relationships 
 
 We will create several scatter plots between 2 variables because all 6 variables are continuous. 
 
 ```{r}
-ggplot(swiss_long, aes(x = Value, y = Fertility)) +
-  geom_point(color = "steelblue", size = 2) +
-  geom_smooth(method = "loess", se = TRUE, fill = "gray", color = "darkred", size = 1) +
-  facet_wrap(~ Predictor, scales = "free_x", strip.position = "bottom") +
-  labs(
-    title = "Fertility vs Predictor Variables (Loess Curves + Uncertainty)",
-    x = "Predictor Value",
-    y = "Fertility"
-  ) +
-  theme_minimal() +
-  theme(
-    strip.placement = "outside",              
-    strip.background = element_blank(),      
-    axis.title.x = element_text(margin = margin(t = 10)),
-    axis.text.x = element_text(angle = 0)    
-  )
+plot_list <- list()
+
+predictors <- c("Agriculture", "Examination", "Education", "Catholic", "Infant.Mortality")
+for(predictor in predictors) {
+  p <- ggplot(swiss, aes_string(x = predictor, y = "Fertility")) +
+    geom_point() +
+    geom_smooth(method = "lm", se = FALSE) +
+    ggtitle(paste("Fertility vs", predictor)) +
+    theme_minimal()
+  
+  plot_list[[predictor]] <- p
+}
+
+grid.arrange(grobs = plot_list, ncol = 2) 
 ```
 
 Data Visualization: Correlation Plots
+
 ```{r}
+# Calculate correlations (remove non-numeric 'Provinces' column)
+cor_matrix <- cor(swiss[, -1])  # -1 excludes first column
 
+# Basic correlation plot
+corrplot(cor_matrix, method = "circle")
+
+# Enhanced version with values and ordering
+corrplot(cor_matrix, 
+         method = "number",      # Show correlation coefficients
+         type = "upper",         # Only show upper triangle
+         order = "hclust",       # Cluster variables
+         tl.col = "black",       # Text label color
+         tl.srt = 45,            # Text label rotation
+         addCoef.col = "black")  # Coefficient color
 ```
-
 
 ### Q1.2
 
 Variable selection to choose the best model. (10pts)
 
 **Solution ** 
+We used the stepwise selection method to identify the best linear model for predicting Fertility based on the predictors: Agriculture, Examination, Education, Catholic, and Infant Mortality. The full model included all main effects as well as all possible two-way interactions (e.g., Agriculture:Examination). The step() function was applied to iteratively add and remove terms in order to minimize the Akaike Information Criterion (AIC), using both forward and backward selection.
+
+The resulting best model achieved the lowest AIC score of 317.41 and included the following terms:
+Main effects: Agriculture, Examination, Education, Catholic, Infant Mortality
+Interaction terms: Agriculture:Examination, Agriculture:Education, Agriculture:Infant.Mortality, Examination:Education, Examination:Infant.Mortality, and Education:Catholic.
+
+All variables in the model were statistically significant except for the interactions Agriculture:Examination and Agriculture:Education. The model has an R-squared value of 0.811, indicating that approximately 81% of the variance in the Fertility variable is explained by the model. Additionally, the overall model is highly significant, with a p-value of 1.283e-09.
 
 ```{r}
-blmodi <- lm(Fertility ~ Agriculture + Examination + Education + Catholic + Infant.Mortality, data = swiss)
-par(mfrow = c(1,2))
-termplot(lmodi, partial.resid = TRUE, terms = 2) 
-termplot(blmodi, partial.resid = TRUE, terms = 2) 
+full_model <- lm(Fertility ~ (Agriculture + Examination + Education + Catholic + Infant.Mortality)^2, data = swiss)
+best_model <- step(full_model, direction = "both", trace = FALSE)
+summary(best_model)
+```
+
+```{r}
+cat("AIC of the best model:", AIC(best_model), "\n")
+cat("Predictors in the best model:\n")
+print(attr(terms(best_model), "term.labels"))
+```
+The following code performs single-term deletion diagnostics on the best model obtained earlier. It evaluates how the model's performance would change if each term were removed individually. The results show that two interaction terms — Agriculture:Examination and Agriculture:Education — have p-values greater than 0.05, indicating they are not statistically significant.
+
+Additionally, the RSS (Residual Sum of Squares) values associated with these terms are lower compared to the others, meaning that removing these terms results in only a slight increase (or even improvement) in model error. This suggests that these predictors do not contribute meaningfully to improving model fit, and could potentially be removed to simplify the model without significantly compromising performance. 
+
+```{r}
+drop1(best_model, test = "F")
+```
+
+We will further test to see if the non-signifcant interaction terms can be dropped. Because the p-value is greater than 0.05, we are able to conclude that the two interaction terms: Agriculture:Examination and Agriculture:Education can be dropped. 
+
+```{r}
+reduced_model <- update(best_model, . ~ . - Agriculture:Examination - Agriculture:Education)
+anova(reduced_model, best_model)  
+```
+Refitting the final model after dropping the two nonsignificant interaction terms gives us the following: 
+$$y=160.178
+ −1.217⋅Agriculture
+ −3.037⋅Examination
+ −0.501⋅Education
+ +0.179⋅Catholic
+ −3.462⋅Infant.Mortality
+ +0.051⋅(Agriculture×Infant.Mortality)
+ +0.004⋅(Examination×Education)
+ +0.127⋅(Examination×Infant.Mortality)
+ −0.012⋅(Education×Catholic) $$
+
+```{r}
+final_model <- lm(
+  Fertility ~ Agriculture + Examination + Education + Catholic + Infant.Mortality +
+              Agriculture:Infant.Mortality + Examination:Education +
+              Examination:Infant.Mortality + Education:Catholic,
+  data = swiss
+)
+summary(final_model)
 ```
 
 ### Q1.3
@@ -167,15 +230,70 @@ termplot(blmodi, partial.resid = TRUE, terms = 2)
 An exploration of transformations to improve the fit of the model. (10pts)
 
 **Solution **
+
+```{r}
+
+transformations <- list(
+  log = function(x) log(x + 1),
+  inverse = function(x) 1 / (x + 1),
+  poly = function(x) poly(x, degree = 2),
+  bspline = function(x) bs(x, degree = 3)
+)
+
+
+
+plot_list <- list()
+
+for (i in 1:nrow(top_models)) {
+  pred <- top_models$Predictor[i]
+  trans_name <- top_models$Transformation[i]
+  trans_fn <- transformations[[trans_name]]
+  
+  trans_x <- trans_fn(swiss[[pred]])
+  
+  if (is.matrix(trans_x)) {
+    df <- cbind(Fertility = swiss$Fertility, as.data.frame(trans_x))
+    model <- lm(Fertility ~ ., data = df)
+    pred_vals <- predict(model)
+  } else {
+    df <- data.frame(Fertility = swiss$Fertility, x = trans_x)
+    model <- lm(Fertility ~ x, data = df)
+    pred_vals <- predict(model)
+  }
+  
+  plot_df <- data.frame(
+    Original = swiss[[pred]],
+    Fertility = swiss$Fertility,
+    Fitted = pred_vals
+  )
+  
+  p <- ggplot(plot_df, aes(x = Original, y = Fertility)) +
+    geom_point(color = "steelblue", alpha = 0.6) +
+    geom_line(aes(y = Fitted), color = "darkred") +
+    labs(
+      title = paste("Fertility vs", pred, "(", trans_name, ")"),
+      x = pred,
+      y = "Fertility"
+    ) +
+    theme_minimal()
+  
+  plot_list[[pred]] <- p
+}
+print(top_models)
+gridExtra::grid.arrange(grobs = plot_list, ncol = 2)
+
+```
+
+### Q1.4
+
+Diagnostics to check the assumptions of your model. (10pts)
+
 ```{r}
 
 ```
 
-
-### Q1.4
-Diagnostics to check the assumptions of your model. (10pts)
-
 **Solution ** 
+
 We conduct Regression Diagnostics. We recall that the assumptions of the linear model: 
 1. Y depends on the covariates in X linearly: E(Y) = XB or E(e) = 0. We use the residual-fitted valu plot, scale location plot, and residual-leverae plto to check for this: 
 
@@ -450,17 +568,23 @@ hist(pima_clean$diastolic[pima_clean$test == "Positive"], main = "Distribution o
 qqnorm(pima_clean$diastolic[pima_clean$test == "Negative"]); qqline(pima_clean$diastolic[pima_clean$test == "Negative"])
 qqnorm(pima_clean$diastolic[pima_clean$test == "Positive"]); qqline(pima_clean$diastolic[pima_clean$test == "Positive"])
 ```
-We are able to see that the distributions are normally distributed and so we are able to use the t-test (parametric test) to compare the means of the diastolic blood pressures between the two groups (positive and negative test). 
+We are able to see that the distributions are normally distributed and so we are able to use the t-test (parametric test) to compare the means of the diastolic blood pressures between the two groups (Positive and Negative tests). 
 
 ```{r}
 t.test(diastolic ~ test, data = pima_clean)  
 ```
-We are able to see from the results of the two sample t-test that 
 
-Women who test positive have higher diastolic blood pressure.
-The diastolic blood pressure is significant in the regression model. 
+We are able to see from the results of the two sample t-test that the difference in the means of the Diastolic Blood Pressure between the two groups (Positive and Negative) is statistically significant because the p-value is smaller than 0.05. The means in each group are as follows: Negative group (the diastolic blood pressure mean is 70.87) and the Positive group (the diastolic blood pressure mean is 75.32143.) Therefore, we are able to conclude that women who test positive do have higher diastolic blood pressures.  
 
-The answers are only apprently contradictory because 
+**I DONT UNDERSTAND THIS ** 
+Next, we check whether the predictor variable diastolic blood pressure is significant in the regression model. The regression model that is utilized in this question is the full model. The p-value is 0.90446 
+
+```{r}
+summary(full_model)
+```
+
+
+The distinction between the two questions and discuss why the answers are only apparently contradictory 
 
 
 
