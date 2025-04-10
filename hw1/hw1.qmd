@@ -34,6 +34,9 @@ library(faraway)
 library(gridExtra)
 library(splines)
 library(mlbench)
+library(lmtest)
+library(mice)
+library(MASS)
 ```
 
 To submit homework, please submit Rmd and html files to bruinlearn by the deadline.
@@ -64,15 +67,15 @@ swiss <- swiss %>%
 ```{r}
 str(swiss)
 ```
-The summary statistics (minimum, 1st quartile, median, mean 3rd quartile, and maximum) of the variables in the swiss dataset are as follows: 
+The summary statistics (minimum, 1st quartile, median, mean 3rd quartile, and maximum) of the variables in the swiss dataset are as follows: We are able to obtain the numerical summaries of all these predictor variables becuase they are all quantitiative. 
 
 ```{r}
 summary(swiss) 
 ```
-
 Data Visualization Plots: Univariate 
 
-1. Univariate plot of the Fertility Variable: 
+1. Univariate plot of the Fertility Variable (response variable): The distribution appears to be slightly right skewed (positive skewed) where most provinces have moderate fertility rates and a few relatively high nes. There is a single peak, making the distribution approximately unimodal where the most common fertility rates are between 70-75. There are some provinces that have unusually low or high fertility rates (around 35 or 95). 
+
 ```{r}
 ggplot(swiss, aes(x = Fertility)) +
   geom_histogram(aes(y = ..density..), bins = 20, fill = "skyblue", color = "black", alpha = 0.6) +
@@ -83,13 +86,13 @@ ggplot(swiss, aes(x = Fertility)) +
     y = "Density"
   ) +
   theme_minimal()
-
-unique(swiss$Examination)
 ```
 
 2. Boxplots for the Predictor Variables: 
+
+The boxplots show the distribution of the predictor variables (Agriculture, Catholic, Education, Examination, and Infant Mortality) in the swiss dataset. Brief summary of the boxplots: 1. Agriculture: The median percentage of males involved in agriculture as occupation lies around 
+
 ```{r}
-# Select only predictor variables
 predictor_vars <- c("Agriculture", "Examination", "Education", "Catholic", "Infant.Mortality")
 
 # Reshape to long format
@@ -100,11 +103,14 @@ swiss_long <- swiss %>%
 ggplot(swiss_long, aes(x = "", y = Value)) +
   geom_boxplot(fill = "lightgreen") +
   facet_wrap(~ Variable, scales = "free_y") +
-  labs(title = "Boxplots of Predictor Variables in the Swiss Dataset", x = "", y = "") +
+  labs(title = "Boxplots of Predictor Variables", x = "", y = "") +
   theme_minimal()
 ```
+3. Density plots for all variables including Fertility
+
+For better visualization of the distributions of all the predictor variables and the response variable, Fertility, we plot the density plots. 
+
 ```{r}
-# 3. Density plots for all variables including Fertility
 swiss_long <- swiss %>%
   pivot_longer(cols = -Provinces, names_to = "Variable", values_to = "Value")
 
@@ -218,7 +224,6 @@ summary(pima)
 Create a factor version of the test results and use this to produce an interleaved histogram to show how the distribution of insulin differs between those testing positive and negative. Do you notice anything unbelievable about the plot? (5pts)
 
 **Solution **
-
 ```{r}
 pima$test <- factor(pima$test, levels = c(0,1), labels = c("Negative", "Positive"))
 ```
@@ -244,22 +249,22 @@ Abnormalities of the graph: The histogram displays a large concentration of insu
 Replace the zero values of `insulin` with the missing value code `NA`. Recreate the interleaved histogram plot and comment on the distribution. (5pts)
 
 ```{r}
-pima$insulin <- ifelse(pima$insulin == 0, NA, pima$insulin)
+pima$insulin_clean <- ifelse(pima$insulin == 0, NA, pima$insulin)
 ```
 
 ```{r}
-ggplot(pima, aes(x = insulin, fill = test)) +
-  geom_histogram(position = "identity", alpha = 0.5, bins = 30, na.rm = TRUE) +
+ggplot(pima, aes(x = insulin_clean, fill = test)) +
+  geom_histogram(position = "identity", bins = 30, alpha = 0.7, na.rm = TRUE) +
   labs(
-    title = "Insulin Levels by Test Result (After removing all NA values)",
-    x = "Insulin Level",
+    title = "Distribution of Insulin Levels by Diabetes Test Result (Excluding Zeros)",
+    x = "Insulin",
     y = "Count",
     fill = "Test Result"
   ) +
-  theme_minimal()
+  theme_minimal() 
 ```
 
-Creating the interleaved histogram plot: Amongst the Pima Indians who tested negative (pink), the majority of individuals have insulin levels clustered between 0-150. There is a peak at around insulin levels of 100-125. In addition, the distribution of insulin levels is right skewed where there are fewer people with higher insulin levels. There are a couple of outliers of individuals whose insulin levels are above 300. Amongst the Pima Indians who tested positive (blue), the majority of individuals have insulin levels clustered between 100-250. The distribution is more spread out compard to the distribution corresponding to the inuslin levels of the Pima Indians who tested negative. Compared to the negative group, the positive group has a longer right tail, which suggests that some individuals who tested positive have very high insulin levels of above 500. 
+Creating the interleaved histogram plot: Amongst the Pima Indians who tested negative (pink), the majority of individuals have insulin levels clustered between 0-150. There is a peak at around insulin levels of 100-125. In addition, the distribution of insulin levels is right skewed where there are fewer people with higher insulin levels. There are a couple of outliers of individuals whose insulin levels are above 300. Amongst the Pima Indians who tested positive (blue), the majority of individuals have insulin levels clustered between 100-250. The distribution is more spread out compard to the distribution corresponding to the inuslin levels of the Pima Indians who tested negative. Compared to the negative group, the positive group has a longer right tail, which suggests that some individuals who tested positive have very high insulin levels of above 500. We are able to see that the spike at insulin = 0 that we saw in the previous graph is gone because these 0 values were replaced with NA's which were omitted in the plot. The histogram, therefore, reflects only a fraction of the data which may lead to bias interpretations. 
 
 ### Q2.3
 
@@ -269,36 +274,67 @@ Replace the incredible zeroes in other variables with the missing value code. Fi
 We observe from the output of summary(pima) that several predictor variables have a minimum value of 0, specifically: glucose, diastolic, triceps, insulin, and bmi. These values are medically implausible and likely represent missing data, so we will convert them to N/A. However, we will not convert the 0 values in the pregnant variable, as it is perfectly reasonable for individuals in the dataset to have had zero pregnancies and is therefore not indicative of missing data. 
 
 ```{r}
-summary(pima)
-variables <- c("glucose", "diastolic", "triceps", "bmi") 
-pima[variables] <- lapply(pima[variables], function(x) ifelse(x == 0, NA, x))
+vars_to_clean <- c("glucose", "diastolic", "triceps", "insulin", "bmi")
+
+pima_clean <- pima
+pima_clean[vars_to_clean] <- lapply(pima[vars_to_clean], function(x) ifelse(x == 0, NA, x))
 ```
 
 ```{r}
-pima_clean <- na.omit(pima)
-nrow(pima_clean)
+full_model <- glm(test ~ pregnant + glucose + diastolic + triceps + insulin + bmi + diabetes + age,
+                 family = binomial,
+                 data = pima_clean)
 
-model_first <- glm(test ~ ., data = pima_clean, family = binomial)
-model_first
+summary(full_model)
 ```
-The number of observations used in the model fitting is 392. This is fewer than the 768 observations in the original data frame because we removed all rows containing missing values in the predictor variables. The original dataset included rows with invalid zero values in variables such as glucose, diastolic, triceps, insulin, and bmi, which are not physiologically realistic. These zeroes were replaced with NA, and the rows containing them were excluded during model fitting to ensure data quality.
+
+```{r}
+n_used <- nobs(full_model)
+n_total <- nrow(pima_clean)
+
+cat("Observations used in model fitting:", n_used, "\n",
+    "Total observations in data frame:", n_total, "\n",
+    "Observations omitted due to missing values:", n_total - n_used, "\n")
+```
+
+The number of observations used in the model fitting is 392. This is fewer than the 768 observations in the original data frame because the glm() function uses only rows with no missing values in any predictor (NA's are excluded). The original dataset included rows with invalid zero values in variables such as glucose, diastolic, triceps, insulin, and bmi, which are not physiologically realistic. These zeroes were replaced with NA, and the rows containing them were excluded during model fitting to ensure data quality. It is important to note that the number of observations that were omitted due to missing values is 376 which makes up a significant portion of the dataset. Using such data may cause bias interpretation, as mentioned below and so it is important to use imputation methods in later interpretations. 
 
 ### Q2.4
 
 Refit the model but now without the insulin and triceps predictors. How many observations were used in fitting this model? Devise a test to compare this model with that in the previous question. (10pts)
 
 ```{r}
-model_second <- glm(test ~ . -insulin -triceps, data = pima_clean, family = binomial)
-model_second 
-nrow(model.frame(model_second))
-```
-We refit the model without the insulin and triceps predictors. The number of observations used in fitting this model is 392, the same as in the previous model, since we are using the same cleaned dataset (pima_clean) with all missing values already removed. The only difference is that this model excludes the insulin and triceps variables as predictors.
+model_reduced <- glm(test ~ pregnant + glucose + diastolic + bmi + diabetes + age,
+                     family = binomial(link = "logit"),
+                     data = pima_clean)
 
-Test to compare this model to the previous model (that included insulin and triceps): We use the likelihood ratio test to compare the two models. The likelihood ratio test compares the goodness of fit of two models and checks whether removing the two predictors - insulin and triceps significantly worsens the model's fit where the null hypothesis is that the reduced model fits the data just as well as the full model. The p-value is 0.6507 (larger than 0.05) so we fail to reject the null hypothesis. Therefore, we have sufficient evidence to conclude the reduced model (without the 2 predictors insulin and triceps) fits the data just as well as the full model and do not significantly contribute to the model when the other predictors are already included in the model. 
+summary(model_reduced)
+```
 
 ```{r}
-anova(model_second, model_first, test = "Chisq")
+n_used_reduced <- nobs(model_reduced)
+cat("Observations used in reduced model that removed insulin and triceps:", n_used_reduced, "\n")
+cat("Observations used in Full Model:", n_used, "\n") 
+cat("Total observations in data frame:", n_total, "\n")
 ```
+
+We refit the model without the insulin and triceps predictors to create a reduced model. The number of observations that were used in this reduced model is 724 which is greater than the number of observations that were used in the full model (392 observations). It is possible that the reduced model has more observations than that of the full model because the reduced model did not drop the rows where there were NA values in the insulin and triceps columns. 
+
+```{r}
+update_nested <- function(object, formula., ..., evaluate = TRUE) {
+    update(object = object, formula. = formula., data = object$model, ..., evaluate = evaluate)
+}
+
+full_model <- glm(test ~ pregnant + glucose + diastolic + triceps + insulin + bmi + diabetes + age,
+                  family = binomial, data = pima_clean)
+
+reduced_model <- update_nested(full_model, . ~ . - insulin - triceps)
+
+lrt_result <- lrtest(full_model, reduced_model)
+print(lrt_result)
+```
+
+Test to compare this model to the previous model (that included insulin and triceps): Because the reduced and full models contain a different number of observations, we will use the update_nested function to ensure that the reduced model is fitted on the exact same 392 observations as the full model, which makes the comparison valid. We use the likelihood ratio test to compare the two models. The likelihood ratio test compares the goodness of fit of two models and checks whether removing the two predictors - insulin and triceps significantly worsens the model's fit where the null hypothesis is that the reduced model fits the data just as well as the full model. The p-value is 0.6507 (larger than 0.05) so we fail to reject the null hypothesis. Therefore, we have sufficient evidence to conclude the reduced model (without the 2 predictors insulin and triceps) fits the data just as well as the full model and do not significantly contribute to the model when the other predictors are already included in the model. Therefore, the simpler model (reduced model without the insulin and triceps predictors) is preferred. 
 
 ### Q2.5
 
@@ -309,56 +345,122 @@ Use AIC to select a model. You will need to take account of the missing values. 
 We perform step-wise selection, adding or dropping predictors to minimize the AIC. We start with the full model that contains all the predictors (pregnant, glucose, diastolic, tricpes, insulin, bmi, diabetes, and age) after removing all the rows that contain NA values. The model selection process of AIC balances the goodness of fit (how well the model explains the data) and the model complexity (penalizes the number of predictors). The lower the AIC, the better the model. Once we start with the full model, we iteratively add or remove predictors (both forward seelctin and backward elimination). 
 
 ```{r}
-variables <- c("glucose", "diastolic", "triceps", "insulin", "bmi")
-pima[variables] <- lapply(pima[variables], function(x) ifelse(x == 0, NA, x))
-pima_clean <- na.omit(pima)
-full_model <- glm(test ~ ., data = pima_clean, family = binomial)
-full_model 
-
-selected_model <- step(full_model, direction = "both")
+vars_to_clean <- c("glucose", "diastolic", "triceps", "insulin", "bmi")
+pima_clean <- pima
+pima_clean[vars_to_clean] <- lapply(pima[vars_to_clean], function(x) ifelse(x == 0, NA, x))
 ```
-
-The model with the lowest AIC value comes out to be the one with the following variables: pregnant + glucose + bmi + diabetes + age. Therefore the best model is represented as: 
 
 ```{r}
-summary(selected_model) 
+pima_complete <- na.omit(pima_clean)
+n_complete <- nrow(pima_complete)
+cat("Number of complete cases:", n_complete, "\n")
 ```
 
+```{r}
+full_model <- glm(test ~ pregnant + glucose + diastolic + triceps + insulin + 
+                  bmi + diabetes + age,
+                  family = binomial,
+                  data = pima_complete)
+
+selected_model <- stepAIC(full_model, direction = "both", trace = FALSE)
+summary(selected_model)
+```
+
+```{r}
+cat("\nSelected predictors:", names(coef(selected_model))[-1], "\n")
+cat("Number of cases used in selected model:", nobs(selected_model), "\n")
+cat("AIC of selected model:", AIC(selected_model), "\n")
+```
+The model with the lowest AIC value comes out to be the one with the following variables: pregnant + glucose + bmi + diabetes + age. The selected model used 5 predictor variables out of 8. The number of cases used in the selected model is 392 (utilized the dataset that removed all the rows containing the NA values for each predictor variable.) The AIC value of the selected model is 356.8851. The selected model can be characterized as: $$y = -9.992 + 0.084X_1 + 0.036X_2 + 0.078X_3 + 1.151X_4 + 0.034X_5$$
 
 ### Q2.6
 
 Create a variable that indicates whether the case contains a missing value. Use this variable as a predictor of the test result. Is missingness associated with the test result? Refit the selected model, but now using as much of the data as reasonable. Explain why it is appropriate to do this. (10pts)
 
+**Solution ** 
+
+First, we create a missingness indicator where 1 means that the row has a missing value (NA) and 0 means that the row does not have any missing values. We indicate this missingness indicator as has_missing. Note that we utilize the pima_clean dataset which is the data after all the 0 values are converted into N/A values. We then use the has_missing variable as a predictor of the test result and we notice that the p-value for the variable is 0.304. This signifies that the cases with missing values are not significantly more likely to test positive for diabetes than complete cases. In other words, we don't have evidence to conclude that the presence of missing data is associated with the test outcome. 
+
 ```{r}
-pima$misssing 
+pima_clean$has_missing <- ifelse(rowSums(is.na(pima_clean[vars_to_clean])) > 0, 1, 0)
+
+missing_test <- glm(test ~ has_missing, 
+                   family = binomial, 
+                   data = pima_clean)
+summary(missing_test)
 ```
+Next, we will refit the selected model using as much of the data as reasonable. Since missingness isn't significantly associated with the outcome, it is reasonable to assume that the data is missing at random. Therefore, instead of removing rows with missing values (which reduces sample size and power), we can impute the missing values with the mean/median or use other imputation methods such as MICE or keep as many observations as possible where variables required for the model are present. This ensures that more data is retained, increasing the statistical power of the final model. In addition, we are able to avoid any biases introduced by only analyzing complete cases, especialy if missingness isn't strongly related to the "test" response outcome. 
 
-From above regression, we found missingness was not associate with outcome. This means that the distribution of outcome when removing data with missing is still a representative of the original distribution. This justifies the use of "complete case" analysis. 
+The next chunk of code performs multiple imputation to handle missing data and then analyzes the imputed datasts. We first create 5 imputed datasets to account for the missing values using the (MICE or Multivariate Imputation by Chained Equations) algorithm where the algorithm predicts the missing values based on observed data and variable relationships. We will then refit the previously selected model (logistic regression with the predictors pregnant + glucose + bmi + diabetes + age) on each imputed dataset (5 total datasets). The results from all the of the 5 models are combined into a single pooled estimate. 
 
+```{r}
+vars_to_impute <- c("test", "pregnant", "glucose", "bmi", "diabetes", "age", 
+                    "diastolic", "triceps", "insulin")
+imp <- mice(pima_clean[vars_to_impute], m = 5, method = "pmm", printFlag = FALSE)
+
+models <- with(imp, glm(test ~ pregnant + glucose + bmi + diabetes + age, 
+                       family = binomial))
+pooled_results <- pool(models)
+summary(pooled_results)
+```
+After refitting the selected model with the imputed datasets, we get the following model: 
+$$y = -9.3813 + 0.1230X_1 + 0.0362X_2 + 0.0885X_3 + 0.8760X_4 + 0.0108X_5$$
 ### Q2.7 
 
-Using the last fitted model of the previous question, what is the difference in the odds of testing positive for diabetes for a woman with a BMI at the first quartile compared with a woman at the third quartile, assuming that all other factors are held constant? Give a confidence interval for this difference.(10pts)
-
+Using the last fitted model of the previous question [model selected in Question 2.5], compute the odds ratio of testing positive for diabetes for a woman with a BMI at the first quartile compared with a woman at the third quartile, assuming that all other factors are held constant? Give a confidence interval for this odds ratio. (10pts)
 
 **Solution ** 
 
-```{r}
+We are utilizing the data set after accounting for the missing values (after removing all NA values). The 
 
+```{r}
+bmi_coef <- coef(selected_model)["bmi"]
+bmi_se <- summary(selected_model)$coefficients["bmi", "Std. Error"]
+
+bmi_quartiles <- quantile(pima_complete$bmi, probs = c(0.25, 0.75), na.rm = TRUE)
+q1 <- bmi_quartiles[1] 
+q3 <- bmi_quartiles[2] 
+bmi_quartiles
 ```
 
-The difference in the odds of testing positive for diabetes for a woman with a BMI at the first quartile compared wiht a woman at the third quartile, assumign hat all other factors are held constant 
+```{r}
+bmi_diff <- (bmi_coef*(q3 - q1))
+or <- exp(bmi_diff) 
 
-The confidence interval for this difference is 
+ci <- exp(bmi_diff + c(-1.96, 1.96) * bmi_se * (q3 - q1))
+sprintf("OR: %.2f (95%% CI: %.2f-%.2f)", or, ci[1], ci[2])
+```
+
+The odds ratio of testing positive for diabetes for a woman with a BMI at the first quartile compared with a woman at the third quartile, assuming that all other factors are held constant is 1.973495. In other words, a woman with a BMI at the third quartile (37.1) has 1.9743 times the odds of testing poistive for diabetes compared to a woman with a BMI at the 1st quartile (28.4), assuming that all other predictors (pregnancies, glucose, and age are held constant). The 95 percent confidence interval for the odds ratio is (1.39-2.80). In other words, we are 95 percent confident that the true odds ratio for diabetes risk (comparing Q3 versus Q1 BMI) lies between 1.36 and 2.64 in the population. 
+
 
 ### Q2.8 
 
 Do women who test positive have higher diastolic blood pressures? Is the diastolic blood pressure significant in the regression model? Explain the distinction between the two questions and discuss why the answers are only apparently contradictory. (10pts)
+
+**Solution ** 
+In order to check if women who test positive have higher diastolic blood pressures on average, we will compare the mean/median values of the diastolic blood pressures between the two testing groups (those who tested positive versus negative) by using a t-test or the Wilcoxon test. We will first check if the distributions of the Diastolic blood pressures within each group (Negative/Positive Tests) are normally distributed or not. 
+
 ```{r}
+# Histograms
+hist(pima_clean$diastolic[pima_clean$test == "Negative"], main = "Distribution of Diastolic BP (Negative Test)")
+hist(pima_clean$diastolic[pima_clean$test == "Positive"], main = "Distribution of Diastolic BP (Positive Test)")
 
+# Q-Q plots
+qqnorm(pima_clean$diastolic[pima_clean$test == "Negative"]); qqline(pima_clean$diastolic[pima_clean$test == "Negative"])
+qqnorm(pima_clean$diastolic[pima_clean$test == "Positive"]); qqline(pima_clean$diastolic[pima_clean$test == "Positive"])
 ```
+We are able to see that the distributions are normally distributed and so we are able to use the t-test (parametric test) to compare the means of the diastolic blood pressures between the two groups (positive and negative test). 
 
+```{r}
+t.test(diastolic ~ test, data = pima_clean)  
+```
+We are able to see from the results of the two sample t-test that 
 
+Women who test positive have higher diastolic blood pressure.
+The diastolic blood pressure is significant in the regression model. 
 
+The answers are only apprently contradictory because 
 
 
 
