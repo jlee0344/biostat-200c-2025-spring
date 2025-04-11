@@ -42,7 +42,7 @@ library(tidyr)
 library(dplyr) 
 library(corrplot)
 library(ggplot2)
-
+library(lmtest)
 ```
 
 
@@ -50,7 +50,7 @@ To submit homework, please submit Rmd and html files to bruinlearn by the deadli
 
 ## Q1. Reivew of linear models (60pts)
 
-The swiss data — use Fertility as the response to practice
+The swiss data — use Fertility as the response to practice. 
 
 ### Q1.1
 
@@ -127,11 +127,10 @@ ggplot(swiss_long, aes(x = Value)) +
 
 Data Visualization: Multivariable Relationships 
 
-We will create several scatter plots between 2 variables because all 6 variables are continuous. 
+We will create several scatter plots between 2 variables because all 6 variables are continuous. Description of the Scatter Plots: 1. Fertility versus Agricutlure: The trend below shows that the higher agriculture activity correlates with higher fertility rates (positive relationship). This aligns with the historical patterns where economies primarly based on agriculture often have larger familities due to labor needs and lower urbanization. 2. Fertility versus Education: The higher education levels often correlate with lower fertility rates. 3. Fertility versus Infant Mortality: The higher infant morality rates, the higher fertility (parents have more children to offset expected losses.) 4. Fertility versus Examination: Fertility may decline as the percentages of draftees receiving highest marks on army examination increases. 5. Fertility versus Catholic: Regions with higher Catholic populations may have higher fertility to due religious norms. 
 
 ```{r}
 plot_list <- list()
-
 predictors <- c("Agriculture", "Examination", "Education", "Catholic", "Infant.Mortality")
 for(predictor in predictors) {
   p <- ggplot(swiss, aes_string(x = predictor, y = "Fertility")) +
@@ -142,29 +141,21 @@ for(predictor in predictors) {
   
   plot_list[[predictor]] <- p
 }
-
 grid.arrange(grobs = plot_list, ncol = 2) 
 ```
 
-Data Visualization: Correlation Plots
+Data Visualization: Correlation Plots Description: The correlation matrix shows the pairwise comparisons of the predictor variables. We are able to see that educaiton and examination are highly positively correlated (0.70) indicating that higher education levels are assocaited with better examination outcomes. Education and Agriculture have a strong negative correlation (-0.64) suggesting that regions with higher agricultural activity tend to have lower education. The predictor variables Catholic and Fertility are negatively correlated (-0.60). Infant mortality showcases weaker correlations with the other variables.
 
 ```{r}
-# Calculate correlations (remove non-numeric 'Provinces' column)
-cor_matrix <- cor(swiss[, -1])  # -1 excludes first column
-
-# Basic correlation plot
-corrplot(cor_matrix, method = "circle")
-
-# Enhanced version with values and ordering
+cor_matrix <- cor(swiss[, -1]) 
 corrplot(cor_matrix, 
-         method = "number",      # Show correlation coefficients
-         type = "upper",         # Only show upper triangle
-         order = "hclust",       # Cluster variables
-         tl.col = "black",       # Text label color
-         tl.srt = 45,            # Text label rotation
-         addCoef.col = "black")  # Coefficient color
+         method = "number",     
+         type = "upper",        
+         order = "hclust",       
+         tl.col = "black",     
+         tl.srt = 45,           
+         addCoef.col = "black") 
 ```
-
 ### Q1.2
 
 Variable selection to choose the best model. (10pts)
@@ -223,6 +214,7 @@ final_model <- lm(
   data = swiss
 )
 summary(final_model)
+AIC(final_model)
 ```
 
 ### Q1.3
@@ -231,95 +223,203 @@ An exploration of transformations to improve the fit of the model. (10pts)
 
 **Solution **
 
+Explanation of Code: To improve model fit, we perform an exhaustive search to identify the best-fitting linear regression model for predicting the Fertility variable in the swiss dataset by testing all possible combinations of five different transformations (identity, log, inverse, B-splines, and orthogonal polynomials) applied to each of the five predictor variables (Agriculture, Examination, Education, Catholic, and Infant.Mortality). For each unique combination of transformations (a total of 5⁵ = 3,125 combinations), it dynamically constructs a model formula, fits a linear model using lm(), and evaluates the model based on the AIC value. If the current model achieves a lower AIC than any previously evaluated model, it is stored as the best model. At the end of the loop, we will obtain the best model with the lowest AIC value, along with the corresponding transformation combination for each predictor variable. 
+
 ```{r}
+predictors <- c("Agriculture", "Examination", "Education", "Catholic", "Infant.Mortality")
+transformations <- c("identity", "log", "inv", "bs", "poly")
 
-transformations <- list(
-  log = function(x) log(x + 1),
-  inverse = function(x) 1 / (x + 1),
-  poly = function(x) poly(x, degree = 2),
-  bspline = function(x) bs(x, degree = 3)
-)
+transform_var <- function(var, trans) {
+  switch(trans,
+         identity = var,
+         log = log(var + 1e-6), 
+         inv = 1 / (var + 1e-6),
+         bs = bs(var, df = 4),
+         poly = poly(var, degree = 2, raw = FALSE))
+}
 
-
-
-plot_list <- list()
-
-for (i in 1:nrow(top_models)) {
-  pred <- top_models$Predictor[i]
-  trans_name <- top_models$Transformation[i]
-  trans_fn <- transformations[[trans_name]]
+generate_model_formula <- function(trans_combo) {
+  terms <- mapply(function(var, trans) {
+    if (trans == "identity") {
+      var
+    } else if (trans %in% c("log", "inv")) {
+      paste0("I(", trans, "(", var, " + 1e-6))")
+    } else if (trans %in% c("bs", "poly")) {
+      paste0(trans, "(", var, ", df=4)")
+    }
+  }, predictors, trans_combo, SIMPLIFY = TRUE)
   
-  trans_x <- trans_fn(swiss[[pred]])
+  formula_str <- paste("Fertility ~", paste(terms, collapse = " + "))
+  as.formula(formula_str)
+}
+
+combos <- expand.grid(rep(list(transformations), length(predictors)),
+                      stringsAsFactors = FALSE)
+best_aic <- Inf  # Initialize with worst possible AIC
+best_transformed_model <- NULL
+best_combo <- NULL
+
+for (i in 1:nrow(combos)) {
+  trans_combo <- combos[i, ]
+  formula <- generate_model_formula(trans_combo)
   
-  if (is.matrix(trans_x)) {
-    df <- cbind(Fertility = swiss$Fertility, as.data.frame(trans_x))
-    model <- lm(Fertility ~ ., data = df)
-    pred_vals <- predict(model)
-  } else {
-    df <- data.frame(Fertility = swiss$Fertility, x = trans_x)
-    model <- lm(Fertility ~ x, data = df)
-    pred_vals <- predict(model)
-  }
-  
-  plot_df <- data.frame(
-    Original = swiss[[pred]],
-    Fertility = swiss$Fertility,
-    Fitted = pred_vals
+  model <- tryCatch(
+    lm(formula, data = swiss),
+    error = function(e) NULL
   )
   
-  p <- ggplot(plot_df, aes(x = Original, y = Fertility)) +
-    geom_point(color = "steelblue", alpha = 0.6) +
-    geom_line(aes(y = Fitted), color = "darkred") +
-    labs(
-      title = paste("Fertility vs", pred, "(", trans_name, ")"),
-      x = pred,
-      y = "Fertility"
-    ) +
-    theme_minimal()
-  
-  plot_list[[pred]] <- p
+  if (!is.null(model)) {
+    current_aic <- AIC(model)
+    if (current_aic < best_aic) {
+      best_aic <- current_aic
+      best_transformed_model <- model
+      best_combo <- trans_combo
+    }
+  }
 }
-print(top_models)
-gridExtra::grid.arrange(grobs = plot_list, ncol = 2)
 
+cat("Best AIC:", best_aic, "\n")
+cat("Best transformation combo:\n")
+for (j in 1:length(predictors)) {
+  cat(predictors[j], ":", best_combo[[j]], "\n")
+}
 ```
+```{r}
+summary(best_transformed_model)
+```
+
+We will conduct stepwise AIC selection for the model that we obtained above (with the transformed predictor variables) to see if another subset of these variables will create a better model fit. 
+
+```{r}
+swiss$bs_exam1 <- bs(swiss$Examination, df=4)[,1]
+swiss$bs_exam2 <- bs(swiss$Examination, df=4)[,2]
+swiss$bs_exam3 <- bs(swiss$Examination, df=4)[,3]
+swiss$bs_exam4 <- bs(swiss$Examination, df=4)[,4]
+
+swiss$poly_edu1 <- poly(swiss$Education, 4)[,1]
+swiss$poly_edu2 <- poly(swiss$Education, 4)[,2]
+swiss$poly_edu3 <- poly(swiss$Education, 4)[,3]
+swiss$poly_edu4 <- poly(swiss$Education, 4)[,4]
+
+swiss$log_infant <- log(swiss$Infant.Mortality + 1e-6)
+
+reduced_transformed_model <- lm(Fertility ~ Agriculture + Catholic + log_infant +
+                   bs_exam1 + bs_exam2 + bs_exam3 + bs_exam4 +
+                   poly_edu1 + poly_edu2 + poly_edu3 + poly_edu4,
+                 data = swiss)
+
+step_model <- stepAIC(reduced_transformed_model, direction = "both", trace = FALSE)
+
+cat("AIC of the best reduced transformed model:", AIC(reduced_transformed_model), "\n")
+cat("Predictors in the best reduced transformed model:\n")
+print(attr(terms(reduced_transformed_model), "term.labels"))
+summary(reduced_transformed_model)
+```
+
+These results show that the full transformed model already has the lowest possible AIC among all nesed models considered by stepwise selection. 
+
+```{r}
+AIC(full_model, best_transformed_model, reduced_transformed_model)
+```
+
+The AIC score of the full transformed model is lower than that of the full model (before transforming the predictors). The full_model has AIC value of 323.38 while the best_transformed_model has an AIC score of 312.0989. Therefore, we can conclude that currently, the best model can be characterized by: 
+
+$$ Fertility = 
+  14.85392 
+  - 0.16796 * Agriculture 
+  - 27.98577 * bs(Examination, df=4)[,1] 
+  + 6.48764 * bs(Examination, df=4)[,2] 
+  - 51.49237 * bs(Examination, df=4)[,3] 
+  + 21.05979 * bs(Examination, df=4)[,4] 
+  - 86.49956 * poly(Education, 4)[,1] 
+  - 37.36313 * poly(Education, 4)[,2] 
+  + 9.59323 * poly(Education, 4)[,3] 
+  + 9.10119 * poly(Education, 4)[,4] 
+  + 0.09798 * Catholic 
+  + 25.18993 * log(Infant.Mortality + 1e-6) $$
 
 ### Q1.4
 
 Diagnostics to check the assumptions of your model. (10pts)
 
-```{r}
-
-```
-
 **Solution ** 
 
-We conduct Regression Diagnostics. We recall that the assumptions of the linear model: 
-1. Y depends on the covariates in X linearly: E(Y) = XB or E(e) = 0. We use the residual-fitted valu plot, scale location plot, and residual-leverae plto to check for this: 
+1. Residuals versus Fitted Values: The residuals appear randomly scattered around 0 (horizontal line), suggesting no severe non-linearity. We are able to see that there is a slight funnel shape (wider spread at higher fitted values) which may indicate mild heteroscedasticity (non-constant variance). 
 
-2. Errors are iid with common variance. We use the QQ plot to check the normality assumption.
+2. Scale Location (Spread-Location): We will now assess the homoscedasticity (constant variance of residuals). We are able to see that the points are roughly horizontal with minor fluctuations, which suggests moderate homoscedasticity. 
+
+3. Q-Q Residuals: We will test the normality of residuals. In the graph, the points mostly follow the dashed 45 degree line, indicating approximate normality. Minor deviations in the tails are not severe enough to be a problem. 
+
+4. Residuals versus Leverage: We will plot this graph to identify influential outliers (high leverage + high residuals). We are able to see that the no points fall outside Cook's distance contours (red dashed lines), suggesting that there are no highly influential outliers. There a few points with high leverage but these modest residuals pose little risk. 
 
 ```{r}
+par(mfrow = c(2, 2))
+plot(best_transformed_model)
+par(mfrow = c(1, 1))
+```
+The results of the Shapiro Wilk normality test are shown below. The p-value is 0.8367. Therefore, we fail to reject the null hypothesis that the residuals are normally distributed. Therefore, this suggests that the model's residuals do not significantly deviate from normality. 
 
+```{r}
+shapiro.test(residuals(best_transformed_model)) 
+```
+Lastly, we will run the Studentized Breusch-Pagan test to check for heteroscedasticity (non-constant variance of residuals) in a linear regression model. Because the residual plots from above hinted at heteroscedastcity, we will run this test to ensure that the residuals have constant variance. The p-value resulting from the Breusch-Pagan Test is 0.7476 so we fail to reject the null hypothesis. Therefore, we are able to conclude that the residuals have constant variance. 
+
+```{r}
+bptest(best_transformed_model) 
 ```
 
-
 ### Q1.5
+
 Some predictions of future observations for interesting values of the predictors.(5pts)
 
 **Solution ** 
-```{r}
 
+```{r}
+new_data <- data.frame(
+  Agriculture = c(50, 70),
+  Examination = c(15, 35),
+  Education = c(12, 8),
+  Catholic = c(60, 95),
+  Infant.Mortality = c(20, 24)
+)
+
+bs_exam_basis <- bs(swiss$Examination, df = 4)
+poly_edu_basis <- poly(swiss$Education, degree = 4, raw = FALSE)
+
+attr(bs_exam_basis, "class") <- "bs"
+attr(poly_edu_basis, "class") <- "poly"
+
+bs_exam_pred <- predict(bs(swiss$Examination, df = 4), new_data$Examination)
+poly_edu_pred <- predict(poly(swiss$Education, degree = 4, raw = FALSE), new_data$Education)
+
+new_data$bs_exam1 <- bs_exam_pred[,1]
+new_data$bs_exam2 <- bs_exam_pred[,2]
+new_data$bs_exam3 <- bs_exam_pred[,3]
+new_data$bs_exam4 <- bs_exam_pred[,4]
+
+new_data$poly_edu1 <- poly_edu_pred[,1]
+new_data$poly_edu2 <- poly_edu_pred[,2]
+new_data$poly_edu3 <- poly_edu_pred[,3]
+new_data$poly_edu4 <- poly_edu_pred[,4]
+
+new_data$log_infant <- log(new_data$Infant.Mortality + 1e-6)
+predicted_fertility <- predict(best_transformed_model, newdata = new_data)
+print(predicted_fertility)
 ```
+
+We are able to see that the first observation has a predicted fertility of 76.76199. The second observation has a predicted pfertility of 99.87283. 
 
 
 ### Q1.6
 An interpretation of the meaning of the model by writing a scientific abstract. (<150 words) (10pts)
 
-  + BACKGROUND: brief intro of the study background, what are the existing findings
-  
-  + OBJECTIVE: state the overall purpose of your research, e.g., what kind of knowledge gap you are trying to fill in
-  
+  + BACKGROUND: brief intro of the study background, what are the existing findings: 
+Like many underdeveloped countries in the late 19th century, Switzerland in 1888 was undergoing a demographic transition—a shift from high fertility and mortality rates to lower levels as a result of social and economic development. Understanding the effects of different socioeconomic and cultural factors on fertility during this period highlights the importance of using statistical modeling to better understand how different and therefore improve the of countries in our current society. 
+
+  + OBJECTIVE: state the overall purpose of your research, e.g., what kind of knowledge gap you are trying to fill in: 
+
+The goal of this analysis is to examine how various socio-economic and religious factors—such as Agriculture, Examination (education access), Education, Catholicism, and Infant Mortality—are associated with fertility rates in Switzerland's provinces during the late 19th century. We aim to identify the most relevant predictors (and its interactions) of fertility and assess how model transformations can improve the model fit. The development of such a model can help future global leaders to better understand 
+
   + METHODS: study design (how these data were collected), outcome definitions, statistical procedures used
   
   + RESULTS: summary of major findings to address the question raised in objective
@@ -424,7 +524,7 @@ Refit the model but now without the insulin and triceps predictors. How many obs
 ```{r}
 model_reduced <- glm(test ~ pregnant + glucose + diastolic + bmi + diabetes + age,
                      family = binomial(link = "logit"),
-                     data = pima_clean)
+                     data = pima_clean) 
 
 summary(model_reduced)
 ```
@@ -507,6 +607,7 @@ missing_test <- glm(test ~ has_missing,
                    data = pima_clean)
 summary(missing_test)
 ```
+
 Next, we will refit the selected model using as much of the data as reasonable. Since missingness isn't significantly associated with the outcome, it is reasonable to assume that the data is missing at random. Therefore, instead of removing rows with missing values (which reduces sample size and power), we can impute the missing values with the mean/median or use other imputation methods such as MICE or keep as many observations as possible where variables required for the model are present. This ensures that more data is retained, increasing the statistical power of the final model. In addition, we are able to avoid any biases introduced by only analyzing complete cases, especialy if missingness isn't strongly related to the "test" response outcome. 
 
 The next chunk of code performs multiple imputation to handle missing data and then analyzes the imputed datasts. We first create 5 imputed datasets to account for the missing values using the (MICE or Multivariate Imputation by Chained Equations) algorithm where the algorithm predicts the missing values based on observed data and variable relationships. We will then refit the previously selected model (logistic regression with the predictors pregnant + glucose + bmi + diabetes + age) on each imputed dataset (5 total datasets). The results from all the of the 5 models are combined into a single pooled estimate. 
@@ -551,7 +652,6 @@ sprintf("OR: %.2f (95%% CI: %.2f-%.2f)", or, ci[1], ci[2])
 
 The odds ratio of testing positive for diabetes for a woman with a BMI at the first quartile compared with a woman at the third quartile, assuming that all other factors are held constant is 1.973495. In other words, a woman with a BMI at the third quartile (37.1) has 1.9743 times the odds of testing poistive for diabetes compared to a woman with a BMI at the 1st quartile (28.4), assuming that all other predictors (pregnancies, glucose, and age are held constant). The 95 percent confidence interval for the odds ratio is (1.39-2.80). In other words, we are 95 percent confident that the true odds ratio for diabetes risk (comparing Q3 versus Q1 BMI) lies between 1.36 and 2.64 in the population. 
 
-
 ### Q2.8 
 
 Do women who test positive have higher diastolic blood pressures? Is the diastolic blood pressure significant in the regression model? Explain the distinction between the two questions and discuss why the answers are only apparently contradictory. (10pts)
@@ -560,14 +660,13 @@ Do women who test positive have higher diastolic blood pressures? Is the diastol
 In order to check if women who test positive have higher diastolic blood pressures on average, we will compare the mean/median values of the diastolic blood pressures between the two testing groups (those who tested positive versus negative) by using a t-test or the Wilcoxon test. We will first check if the distributions of the Diastolic blood pressures within each group (Negative/Positive Tests) are normally distributed or not. 
 
 ```{r}
-# Histograms
 hist(pima_clean$diastolic[pima_clean$test == "Negative"], main = "Distribution of Diastolic BP (Negative Test)")
 hist(pima_clean$diastolic[pima_clean$test == "Positive"], main = "Distribution of Diastolic BP (Positive Test)")
 
-# Q-Q plots
 qqnorm(pima_clean$diastolic[pima_clean$test == "Negative"]); qqline(pima_clean$diastolic[pima_clean$test == "Negative"])
 qqnorm(pima_clean$diastolic[pima_clean$test == "Positive"]); qqline(pima_clean$diastolic[pima_clean$test == "Positive"])
 ```
+
 We are able to see that the distributions are normally distributed and so we are able to use the t-test (parametric test) to compare the means of the diastolic blood pressures between the two groups (Positive and Negative tests). 
 
 ```{r}
@@ -576,15 +675,12 @@ t.test(diastolic ~ test, data = pima_clean)
 
 We are able to see from the results of the two sample t-test that the difference in the means of the Diastolic Blood Pressure between the two groups (Positive and Negative) is statistically significant because the p-value is smaller than 0.05. The means in each group are as follows: Negative group (the diastolic blood pressure mean is 70.87) and the Positive group (the diastolic blood pressure mean is 75.32143.) Therefore, we are able to conclude that women who test positive do have higher diastolic blood pressures.  
 
-**I DONT UNDERSTAND THIS ** 
-Next, we check whether the predictor variable diastolic blood pressure is significant in the regression model. The regression model that is utilized in this question is the full model. The p-value is 0.90446 
+Next, we check whether the predictor variable diastolic blood pressure is significant in the regression model. The regression model that is utilized in this question is the full model before removing the triceps and insulin. The p-value corresponding to diastolic blood pressure is 0.90446 which is not significant in the full model. This means that DBP does not contribute significantly to the regression model when other variables are included. 
 
 ```{r}
 summary(full_model)
 ```
 
-
-The distinction between the two questions and discuss why the answers are only apparently contradictory 
-
+The first question examines a univariate association (diastolic blood pressure versus the test outcome while not taking account for the other predictors in the model) while the second question examines a multivariate association (the diastolic blood pressure's contribution after accounting for other predictors). Although the t-test shows that the diastolic blood pressure differs between the groups in isolation, the regression model shows that the diastolic blood pressure predictor variables does not provide additional predictive power beyond the other variables in the model. Therefore, the answers seem contradictory because in the t-test we were able to see that the diastolic blodo pressure alone is associated with the test outcome. In the regression, diastolic blood pressure may be correlated with other predictors, therefore making it insiginificant. In addition, even though the mean difference between the diastolic blood pressures between the two testing groups may be statistically significant, it doesn't improve the prediction meaningfully in a multivariate model.
 
 
