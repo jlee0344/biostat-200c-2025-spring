@@ -352,7 +352,7 @@ Find the best sub-model using the lasso with cross validation.
 
 ## Q2. Odds ratios (20pts)
 
-Consider a $2 \times 2$ contingency table from a prospective study in which people who were or were not exposed to some pollutant are followed up and, after several years, categorized according to the presense or absence of a disease. Following table shows the probabilities for each cell. The odds of disease for either exposure group is $O_i = \pi_i / (1 - \pi_i)$, for $i = 1,2$, and so the odds ratio is
+Consider a $2 \times 2$ contingency table from a prospective study in which people who were or were not exposed to some pollutant are followed up and, after several years, categorized according to the presense or absence of a disease. Following table shows the probabilities for each cell. The odds of disease for either exposure group is $O_i = \pi_i / (1 - \pi_i)$, for $i = 1,2$, and so the odds ratio is  
 
 $$
 \phi = \frac{O_1}{O_2} = \frac{\pi_1(1 - \pi_2)}{\pi_2 (1 - \pi_1)}
