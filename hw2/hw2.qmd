@@ -238,6 +238,7 @@ county_data %>%
 ```
 
 Write final data into a csv file for future use.
+
 ```{r}
 write_csv(county_data, "/Users/julielee/Downloads/covid19-county-data-20200404.csv.gz")
 ```
@@ -274,49 +275,91 @@ What assumptions of logistic regression may be violated by this data set?
 **Solution ** 
 There are several logistic regression assumptions that may be violated when modeling outcomes pertaining to, for instance, mortality from COVID-19 or the presence of a confirmed case of COVID-19 as we will explore later in the report. These assumptions are: 
 
-**1. Binary Outcome: ** The dependent variable should be binary (Example: Death = 1/0). 
-**2. Independence of Observations: ** The observations (counties) should be independent. 
-**3. Linearity of Logit (No Severe Confounding) **: 
-**4. No Perfect Separation: ** 
-**5. No Severe Multicollinearity: ** 
-**6. Adequate Sample Size: ** 
+**1. Independence of Observations: ** The observations (counties) should be independent. Because we do not know the full background of the dataset, we do not have information regarding whether the COVID-19 cases/deaths in nearby counties or states may be spatially correlated (potentially due to similar healthcare systems or government policies).
 
-```{r}
+**2. Linearity of Log-Odds (Linearity Assumption): ** The relationships between the predictors (such as percent_smokers, percent_fair_or_poor_health) and the log-odds of COVID-19 outcomes may not be linear. 
 
-```
+**3. No Outliers/Influential Points: ** The urban counties (such as New York/Los Angeles) may have extreme COVID-19 case/death counts compared to other rural areas. Such outliers may affect the coefficient estimates. 
 
+**4. Adequate Sample Size: ** There are only 1446 counties in the sample size. Although this sample size may be adequte, rare outcomes (such as deaths in low-population counties) may cause small-sample bias. 
+
+**5. Binary Outcome Requirement: ** Logistic regression requires a binary outcome for the "deaths" and "confirmed" predictor variables. Therefore, we must check that these variables only hold 2 values (filter out NA values). 
+
+**6. Missing Data **: Counties with missing health/demographic data may be excluded, biasing results. 
 
 ### Q1.3 (10pts)
 
 Run a logistic regression, using variables `state`, ..., `percent_rural` as predictors. 
 
-```{r}
+**Solution ** 
+We will run a logisitc regression where the outcome is a binary variable "death_binary" that will have the value 1 if the number of deaths in a county is greater than the median number of deaths overall and 0 if the number of deaths in a county is less than the median number of deaths overall. The logistic regression model will esimate how each predictor affects the log-odds of a county having above-median deaths. 
 
+```{r}
+county_data <- county_data %>%
+  mutate(death_binary = as.numeric(deaths > median(deaths, na.rm = TRUE)))
 ```
 
+Fitting the Logistic Regression Model: 
+
+Note that we will not be including the variable "confirmed" in our model because the outcome variable is death_binary which is related to case counts. Counties with higher confirmed cases are mot likely to have higher deaths and adding a predictor that is strongly assocaited with death_binary doesn't reflect the true risk factors. 
+
+Note that we will exclude the variable "county" in our model because county names are identifiers, not meaningful predictors. Including them would cause perfect multicollinearity because each county is unique. 
+
+```{r}
+excluded_predictors <- c("county", "confirmed", "deaths")
+predictors <- setdiff(names(county_data), c("death_binary", excluded_predictors))
+
+formula <- as.formula(
+  paste("death_binary ~", paste(predictors, collapse = " + "))
+)
+
+model_1 <- glm(
+  formula,
+  data = county_data,
+  family = binomial(link = "logit")
+)
+summary(model_1)
+```
 
 ### Q1.4 (10pts)
 
 Interpret the regression coefficients of 3 significant predictors with p-value <0.05.
 
-```{r}
+**Solution ** 
+The regression coefficients of 3 significant predictors with p-value that is less than 0.05 are: 
 
-```
+1. **percent_rural**: (Regression coefficient: -1.302e-02) with a p-value of 0.01874. Interpretation: A one percent increase in rural population is associated with a -1.302e-02 decrease in the log-odds of high deaths in a county, holding all other predictors constants. In other words, a one percent increase in rural population is associated with a 0.987 or 1.29 percent decrease in the odds of high deaths in a county, holding all other predictors constant. 
 
+2. **population_2**: (Regression coefficient: 5.392e-06) with a p-value of 1.11e-09. Interpretation: 
+
+3. **percent_2**: (Regression coefficient: )
 
 ### Q1.5 (10pts)
 
 Apply analysis of deviance to (1) evaluate the goodness of fit of the model and (2) compare the model to the intercept-only model. 
 
-```{r}
+**Solution ** 
 
+1. Goodness of Fit Test (Comparison of the Current Model versus Saturated Model): We will test whether the logisitc regression model fits the data adequately by comparing the residual deviance to a chi-squared distribution. In other words, the goodness of fit tests evaluates how well a statistical model or distribution fits a set of observed data. The p-value comes out to be 0.143 which is greater than 0.05. Therefore, we have sufficient evidence to fail to reject the null hypothesis and conclude that the model is acceptable and fits well to the given dataset. 
+
+```{r}
+p_value_gof <- 1 - pchisq(model_1$deviance, df = model_1$df.residual)
+cat("Goodness-of-fit p-value:", p_value_gof, "\n")
 ```
 
+2. Likelihood Ratio Test (Comparison of the Current Model versus Intercept-Only Model): We will test whether the logistic regression model is significantly better than the intercept-only model. In other words, we will evaluate whether the predictors collectively improve the model over a baselien (intercept-only) model. The p-value comes out to be < 2.2e-16 which is. less than 0.05. Therefore, we can conclude that our current logisitic regression model with the included predictors significantly improves the model over a baseline (intercept-only) mdoel. 
+
+
+```{r}
+null_model <- glm(death_binary ~ 1, data = county_data, family = binomial)
+anova(null_model, model_1, test = "LRT")  
+```
 
 ### Q1.6 (10pts)
 
 Perform analysis of deviance to evaluate the significance of each predictor. Display the 10 most significant predictors.
 
+**Solution ** 
 ```{r}
 
 ```
@@ -341,14 +384,25 @@ Plot the deviance residuals against the fitted values. Are there potential outli
 ### Q1.9 (5pts)
 
 Plot the half-normal plot. Are there potential outliers in predictor space?
+```{r}
+
+```
+
 
 ### Q1.10 (10pts)
 
 Find the best sub-model using the AIC criterion.
+```{r}
+
+```
+
 
 ### Q1.11 (15pts)
 
 Find the best sub-model using the lasso with cross validation.
+```{r}
+
+```
 
 ## Q2. Odds ratios (20pts)
 
