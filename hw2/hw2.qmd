@@ -27,6 +27,14 @@ knitr::opts_chunk$set(echo = TRUE, cache = FALSE)
 
 To submit homework, please upload both Rmd and html files to Bruinlearn by the deadline.
 
+```{r}
+library(car)
+library(dplyr)
+library(knitr)
+library(tidyverse) 
+```
+
+
 ## Q1. CFR of COVID-19 (90pts)
 
 Of primary interest to public is the risk of dying from COVID-19. A commonly used measure is case fatality rate/ratio/risk (CFR), which is defined as
@@ -168,11 +176,13 @@ county_data <- county_count %>%
   print(width = Inf)
 ```
 Numerical summaries of each variable:
+
 ```{r}
 summary(county_data)
 ```
 
 List rows in `county_data` that don't have a match in `county_count`:
+
 ```{r}
 county_data %>%
   filter(is.na(state) & is.na(county)) %>%
@@ -212,6 +222,7 @@ county_data <- county_count %>%
   left_join(county_info, by = "fips") %>%
   print(width = Inf)
 ```
+
 Summarize again
 
 ```{r}
@@ -292,25 +303,21 @@ There are several logistic regression assumptions that may be violated when mode
 Run a logistic regression, using variables `state`, ..., `percent_rural` as predictors. 
 
 **Solution ** 
-We will run a logisitc regression where the outcome is a binary variable "death_binary" that will have the value 1 if the number of deaths in a county is greater than the median number of deaths overall and 0 if the number of deaths in a county is less than the median number of deaths overall. The logistic regression model will esimate how each predictor affects the log-odds of a county having above-median deaths. 
+We will run a logisitc regression where response variables are characterized as 1. deaths (success) and 2. living (faiure) which is characterized as the formula: confirmed-deaths. The binomial logistic regression model will esimate how each predictor affects the log-odds of a county having high deaths (success) versus low deaths (failure). 
 
-```{r}
-county_data <- county_data %>%
-  mutate(death_binary = as.numeric(deaths > median(deaths, na.rm = TRUE)))
-```
 
-Fitting the Logistic Regression Model: 
+Fitting the Binomial Logistic Regression Model: 
 
 Note that we will not be including the variable "confirmed" in our model because the outcome variable is death_binary which is related to case counts. Counties with higher confirmed cases are mot likely to have higher deaths and adding a predictor that is strongly assocaited with death_binary doesn't reflect the true risk factors. 
 
-Note that we will exclude the variable "county" in our model because county names are identifiers, not meaningful predictors. Including them would cause perfect multicollinearity because each county is unique. 
+Note that we will exclude the variable "county" in our model because county names are identifiers, not meaningful predictors. Including them would cause perfect multicollinearity because each county is unique.
 
 ```{r}
 excluded_predictors <- c("county", "confirmed", "deaths")
-predictors <- setdiff(names(county_data), c("death_binary", excluded_predictors))
+predictors <- setdiff(names(county_data), excluded_predictors)
 
 formula <- as.formula(
-  paste("death_binary ~", paste(predictors, collapse = " + "))
+  paste("cbind(deaths, confirmed - deaths) ~", paste(predictors, collapse = " + "))
 )
 
 model_1 <- glm(
@@ -325,8 +332,16 @@ summary(model_1)
 
 Interpret the regression coefficients of 3 significant predictors with p-value <0.05.
 
+
 **Solution ** 
-The regression coefficients of 3 significant predictors with p-value that is less than 0.05 are: 
+
+The table below showcases the 5 most significant predictors as a result of running the binomail logistic regression: 
+
+```{r}
+
+```
+
+The interpretation of the top 3 significant predictors with p-value <0.05: 
 
 1. **percent_rural**: (Regression coefficient: -1.302e-02) with a p-value of 0.01874. Interpretation: A one percent increase in rural population is associated with a -1.302e-02 decrease in the log-odds of high deaths in a county, holding all other predictors constants. In other words, a one percent increase in rural population is associated with a 0.987 or 1.29 percent decrease in the odds of high deaths in a county, holding all other predictors constant. 
 
@@ -360,17 +375,44 @@ anova(null_model, model_1, test = "LRT")
 Perform analysis of deviance to evaluate the significance of each predictor. Display the 10 most significant predictors.
 
 **Solution ** 
-```{r}
 
+```{r}
+# 1. Perform Analysis of Deviance (Type II Wald tests)
+anova_results <- Anova(model_1, type = 2)
 ```
+
+```{r}
+top_predictors <- anova_results %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("Predictor") %>%
+  arrange(`Pr(>Chisq)`) %>%
+  head(10) %>%
+  mutate(Significance = case_when(
+    `Pr(>Chisq)` < 0.001 ~ "***",
+    `Pr(>Chisq)` < 0.01 ~ "**",
+    `Pr(>Chisq)` < 0.05 ~ "*",
+    TRUE ~ ""
+  ))
+
+kable(top_predictors, digits = c(NA, 2, 2, 4), 
+      caption = "Top 10 Most Significant Predictors of County-Level COVID-19 Deaths")
+```
+
 
 ### Q1.7 (5pts)
 
 Construct confidence intervals of regression coefficients.
 
-```{r}
 
-```
+confint(model_1) 
+coef_estimates <- summary(model_1)$coefficients
+wald_ci <- cbind(
+  Estimate = coef_estimates[, "Estimate"],
+  Lower_95_CI = coef_estimates[, "Estimate"] - 1.96 * coef_estimates[, "Std. Error"],
+  Upper_95_CI = coef_estimates[, "Estimate"] + 1.96 * coef_estimates[, "Std. Error"]
+)
+print(wald_ci)
+
 
 
 ### Q1.8 (5pts)
@@ -420,7 +462,8 @@ is a measure of the relative likelihood of disease for the exposed and not expos
 
 ### Q2.1 (10pts)
 
-For the simple logistic model gi
+For the simple logistic model given by: 
+
 $$
 \pi_i = \frac{e^{\beta_i}}{1 + e^{\beta_i}}, 
 $$
