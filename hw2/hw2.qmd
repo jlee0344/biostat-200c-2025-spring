@@ -32,6 +32,9 @@ library(car)
 library(dplyr)
 library(knitr)
 library(tidyverse) 
+library(ggplot2)
+library(MASS)
+library(glmnet)
 ```
 
 
@@ -74,7 +77,6 @@ names(county_count) <- str_to_lower(names(county_count))
 ```
 
 Sanity check by displaying the unique US states and territories:
-
 ```{r}
 county_count %>%
   select(province_state) %>%
@@ -288,21 +290,24 @@ There are several logistic regression assumptions that may be violated when mode
 
 **1. Independence of Observations: ** The observations (counties) should be independent. Because we do not know the full background of the dataset, we do not have information regarding whether the COVID-19 cases/deaths in nearby counties or states may be spatially correlated (potentially due to similar healthcare systems or government policies).
 
-**2. Linearity of Log-Odds (Linearity Assumption): ** The relationships between the predictors (such as percent_smokers, percent_fair_or_poor_health) and the log-odds of COVID-19 outcomes may not be linear. 
+**2. Linearity of Log-Odds (Linearity Assumption): ** The relationships between the predictors (such as percent_smokers, percent_fair_or_p
 
 **3. No Outliers/Influential Points: ** The urban counties (such as New York/Los Angeles) may have extreme COVID-19 case/death counts compared to other rural areas. Such outliers may affect the coefficient estimates. 
 
 **4. Adequate Sample Size: ** There are only 1446 counties in the sample size. Although this sample size may be adequte, rare outcomes (such as deaths in low-population counties) may cause small-sample bias. 
 
-**5. Binary Outcome Requirement: ** Logistic regression requires a binary outcome for the "deaths" and "confirmed" predictor variables. Therefore, we must check that these variables only hold 2 values (filter out NA values). 
+**5. Binary Outcome Requirement: ** Logistic regression requires a binary outcome variable. Therefore, it is important to set up the outcome variable as having 2 outcomes: Success which is defined as "deaths" and Failure "confirmed-deaths). This woud be a valid binomial set up where each "trial" or confirmed case has a binary outcome (death or survival). 
 
-**6. Missing Data **: Counties with missing health/demographic data may be excluded, biasing results. 
+treats the outcome as a proportion (deaths/confirmed)
+
+**6. Measurement Error in Outcomes: ** There may be underreported deaths and confirmed cases (due to testing and resource limitations) which may introduce noise. The binomial logistic regression model assumes that the outcome is measured without error and so misclassification bias may distort results. 
 
 ### Q1.3 (10pts)
 
 Run a logistic regression, using variables `state`, ..., `percent_rural` as predictors. 
 
 **Solution ** 
+
 We will run a logisitc regression where response variables are characterized as 1. deaths (success) and 2. living (faiure) which is characterized as the formula: confirmed-deaths. The binomial logistic regression model will esimate how each predictor affects the log-odds of a county having high deaths (success) versus low deaths (failure). 
 
 
@@ -320,34 +325,45 @@ formula <- as.formula(
   paste("cbind(deaths, confirmed - deaths) ~", paste(predictors, collapse = " + "))
 )
 
-model_1 <- glm(
-  formula,
-  data = county_data,
-  family = binomial(link = "logit")
-)
-summary(model_1)
+model_1 <- glm(formula, family = binomial(link = "logit"), data = county_data) 
+
+model_summary <- summary(model_1)
+coef_table <- as.data.frame(model_summary$coefficients)
+```
+
+```{r}
+model_summary
+```
+
+```{r}
+coef_table
 ```
 
 ### Q1.4 (10pts)
 
-Interpret the regression coefficients of 3 significant predictors with p-value <0.05.
-
+The interpretation of the top 3 significant predictors with p-value <0.05: 
 
 **Solution ** 
 
-The table below showcases the 5 most significant predictors as a result of running the binomail logistic regression: 
+We first filtered out all the predictors with p-value <0.05 (excluded the intercept of the model). Next, we extracted the top 3 most significant predictors.
 
 ```{r}
+significant_predictors <- coef_table %>%
+  filter(`Pr(>|z|)` < 0.05 & rownames(coef_table) != "(Intercept)") %>%
+  arrange(`Pr(>|z|)`)
 
+top_5_predictors <- head(significant_predictors, 3)
+print(top_5_predictors)
 ```
 
-The interpretation of the top 3 significant predictors with p-value <0.05: 
+The top 3 most signficiant predictors and their corresponding interpretations are: 
 
-1. **percent_rural**: (Regression coefficient: -1.302e-02) with a p-value of 0.01874. Interpretation: A one percent increase in rural population is associated with a -1.302e-02 decrease in the log-odds of high deaths in a county, holding all other predictors constants. In other words, a one percent increase in rural population is associated with a 0.987 or 1.29 percent decrease in the odds of high deaths in a county, holding all other predictors constant. 
+1. **percent_homeowners**: (Regression coefficient: -0.03398152 with a p-value of 3.217538e-08. Interpretation: A one percent increase in the homeownership rate is associated with a 0.03398152 decrease in the log-odds of COVID-19 deaths, holding all other predictors constants. In other words, a one percent increase in the homeownership rate is associated with a decrease in the odds of COVID-19 deaths by 3.3 percent, holding all other predictors constant. We are able to say that communities with high homeownership rates showed significantly lower COVID-18 mortality. 
 
-2. **population_2**: (Regression coefficient: 5.392e-06) with a p-value of 1.11e-09. Interpretation: 
+2. **stateVirginia**: (Regression coefficient: -1.53273214) with a p-value of 1.416288e-06. Interpretation: Compared to the reference state, Virginia has 78 percent lower odds of COVID-19 death. Therefore, we are able to conclude that Virginia's COVID-19 outcomes were significantly better than the reference state. 
 
-3. **percent_2**: (Regression coefficient: )
+3. **percent_insufficient_sleep**: (Regression coefficient: 0.04437542) with a p-value of 8.121630e-06. Interpretation: A one percent increase in the percentage of people who do not get enough sleep is associated with a 0.04437 increase in the log odds of COVID-19 deaths, holding all other predictors constant. in other words, a one percent increase in sleep-derived population is associated with an increase in the odds of COVID-19 deaths by 4.5 percent, holding all other predictor constant. We are able to say that sleep derprivation appears to be a significant risk factor associated with COVID-19 deaths.  
+
 
 ### Q1.5 (10pts)
 
@@ -355,19 +371,31 @@ Apply analysis of deviance to (1) evaluate the goodness of fit of the model and 
 
 **Solution ** 
 
-1. Goodness of Fit Test (Comparison of the Current Model versus Saturated Model): We will test whether the logisitc regression model fits the data adequately by comparing the residual deviance to a chi-squared distribution. In other words, the goodness of fit tests evaluates how well a statistical model or distribution fits a set of observed data. The p-value comes out to be 0.143 which is greater than 0.05. Therefore, we have sufficient evidence to fail to reject the null hypothesis and conclude that the model is acceptable and fits well to the given dataset. 
+1. Likelihood Ratio Test (Comparison of the Current Model versus Intercept-Only Model): We will test whether the binomial logistic regression model is significantly better than the intercept-only model. In other words, we will evaluate whether the predictors collectively improve the model over a baseline (intercept-only) model. The p-value comes out to be < 2.2e-16 which is significantly less than 0.05. Therefore, we can conclude that our current logisitic regression model with the included predictors significantly improves the fit over a baseline (intercept-only) model. This indicates that at least one predictor variable is associated with COVID-19 mortality. 
 
 ```{r}
-p_value_gof <- 1 - pchisq(model_1$deviance, df = model_1$df.residual)
-cat("Goodness-of-fit p-value:", p_value_gof, "\n")
+null_model <- glm(
+  cbind(deaths, confirmed - deaths) ~ 1,
+  family = binomial,
+  data = county_data
+)
+
+anova(null_model, model_1, test = "Chisq")
 ```
 
-2. Likelihood Ratio Test (Comparison of the Current Model versus Intercept-Only Model): We will test whether the logistic regression model is significantly better than the intercept-only model. In other words, we will evaluate whether the predictors collectively improve the model over a baselien (intercept-only) model. The p-value comes out to be < 2.2e-16 which is. less than 0.05. Therefore, we can conclude that our current logisitic regression model with the included predictors significantly improves the model over a baseline (intercept-only) mdoel. 
-
+2. Goodness of Fit Test (Comparison of the Current Model versus Saturated Model): We will test whether the binomial logistic regression model adequately explains the data or shows overdisperson. The p-value comes out to be 1.110223e-16  which is less than 0.05. Therefore, we have sufficient evidence to fail to reject the null hypothesis and can conclude that the model does not fully capture variability (overdispersion present) and that the model does not fit the data well. Overdisperion occurs when the observed variance in the data is greater than what the model expects under its theoretical distribution. In logistic regression (specifically binomial), overdispersion indicates that the data shows more variability than expected given the model's predictions. 
 
 ```{r}
-null_model <- glm(death_binary ~ 1, data = county_data, family = binomial)
-anova(null_model, model_1, test = "LRT")  
+p_value <- 1 - pchisq(model_1$deviance, model_1$df.residual)
+cat("Goodness-of-fit p-value:", p_value)
+```
+
+Effect Size: Pseudo R^2: We will next quantify the variance explained by the McFadden's pseudo-R^2. We are able to conclude that the predictors explain around 43.433 percent of the deviance which indicates moderate to strong explanatory power. 
+
+```{r}
+library(pscl)
+pseudo_r2 <- 1 - (model_1$deviance / model_1$null.deviance)
+cat("Pseudo-R²:", pseudo_r2)
 ```
 
 ### Q1.6 (10pts)
@@ -376,74 +404,241 @@ Perform analysis of deviance to evaluate the significance of each predictor. Dis
 
 **Solution ** 
 
+The anova() function will conduct Type II liklihood Ratio tests to assess each predictor's contribution while accounting for all other variables in the model. The table below showcases the Chi-square statistics, degrees of freedom, and p-values. Some of the predictors that are highly significant include: state, percent_homeowners, percent_insufficient_sleep, percent_severe_housing_problems, percent_children_in_poverty, median_household_income, etc.
+
 ```{r}
-# 1. Perform Analysis of Deviance (Type II Wald tests)
-anova_results <- Anova(model_1, type = 2)
+anova_results <- Anova(model_1, test = "LR", type = "II")  
 ```
 
 ```{r}
-top_predictors <- anova_results %>%
-  as.data.frame() %>%
-  tibble::rownames_to_column("Predictor") %>%
+significant_predictors <- as.data.frame(anova_results) %>%
   arrange(`Pr(>Chisq)`) %>%
-  head(10) %>%
-  mutate(Significance = case_when(
-    `Pr(>Chisq)` < 0.001 ~ "***",
-    `Pr(>Chisq)` < 0.01 ~ "**",
-    `Pr(>Chisq)` < 0.05 ~ "*",
-    TRUE ~ ""
-  ))
-
-kable(top_predictors, digits = c(NA, 2, 2, 4), 
-      caption = "Top 10 Most Significant Predictors of County-Level COVID-19 Deaths")
+  head(10)
+print(significant_predictors)
 ```
-
 
 ### Q1.7 (5pts)
 
 Construct confidence intervals of regression coefficients.
 
+**Solution ** 
+In order to compute the confidence intervals for the regression coefficients in the binomial logistic regression model, we will utilize the confint() function. The results below showcase the lower and upper bounds of the coefficients at a specified confidence level (95 percent). 
 
-confint(model_1) 
-coef_estimates <- summary(model_1)$coefficients
-wald_ci <- cbind(
-  Estimate = coef_estimates[, "Estimate"],
-  Lower_95_CI = coef_estimates[, "Estimate"] - 1.96 * coef_estimates[, "Std. Error"],
-  Upper_95_CI = coef_estimates[, "Estimate"] + 1.96 * coef_estimates[, "Std. Error"]
-)
-print(wald_ci)
-
+```{r}
+confint(model_1)  
+confint.default(model_1)  
+```
 
 
 ### Q1.8 (5pts)
 
 Plot the deviance residuals against the fitted values. Are there potential outliers?
 
-```{r}
+**Solution ** 
 
+The deviance residuals measure the discrepancy between the observed and predicted values in a binomial logistic regression model. In this analysis, we extract the fitted values and deviance residuals from the model and visualize them to assess model fit. The plot reveals a few potential outliers—specifically, observations that deviate substantially from the horizontal red dashed line at y=0, which serves as the baseline for well-fitted points. It is important to note that the points that are far from 0 (top/bottom of the plot) and are positive represent counties where the model underpredicted the chance of death or overpredicted the chance of death (if the residuals are negative.) However, we are able to conclude that the majority of the deviance residuals are randomly scattered around the red dashed line (no specific pattern of the deviance residuals). A smoothed trend line is also included, which curves slightly downward, indicating a mild non-linearity that may suggest model misspecification. We explore these flagged observations in more detail in the subsequent section through a table. 
+
+```{r}
+dev_residuals <- residuals(model_1, type = "deviance")
+fitted_values <- fitted(model_1)
+```
+
+```{r}
+ggplot(data = NULL, aes(x = fitted_values, y = dev_residuals)) +
+  geom_point(alpha = 0.6, color = "steelblue") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  geom_smooth(se = FALSE, color = "darkred") + 
+  labs(
+    x = "Fitted Values (Predicted Probabilities)",
+    y = "Deviance Residuals",
+    title = "Deviance Residuals vs. Fitted Values",
+    subtitle = "Check for outliers and model misspecification"
+  ) +
+  theme_minimal()
+```
+
+Explanation of the Table: 
+
+The table showcases the top deviance residual outliers from the binomial regression model we created earlier. The counties with the largest absolute deviance residuals are listed from top to bottom (difference between the observed and predicted number of deaths was substantial.) The model flagged 51 counties as outliers (based on a threshold of |residual| > 2.5) where Westchester County, New York had 67 deaths out of 13081 confirmed cases. Despite its large population and case count, the model's predicted probability of death deviates from the oberved outcome, causing the large residual. In addition, other counties such as Hampden and Franklin in Massachusetts had moderate confirmed cases but a high number of deaths, causing greater residuals due to underestimation of number of deaths from the model predictions.  
+
+```{r}
+analysis_df <- data.frame(
+  dev_residual = dev_residuals,
+  fitted = fitted_values,
+  county = county_data$county,
+  state = county_data$state,
+  deaths = county_data$deaths, 
+  confirmed = county_data$confirmed
+  
+)
+
+outliers_df <- analysis_df %>% 
+  mutate(outlier = ifelse(abs(dev_residual) > 2.5, "Yes", "No")) %>%
+  filter(outlier == "Yes") %>%
+  arrange(desc(abs(dev_residual)))  
+
+print(outliers_df[, c("county", "state", "dev_residual", "fitted", "confirmed", "deaths")])
 ```
 
 ### Q1.9 (5pts)
 
 Plot the half-normal plot. Are there potential outliers in predictor space?
-```{r}
 
+**Solution ** 
+
+In order to identify potential outliers in the predictor space (unusual combinations of predictor variables), we created a half normal plot of the hat values (leverage) from the binomial logistic regression model created. These hat values measure how far each observation's predictor values are from the average predictor values in the dataset. Identifying high leverage points is essential as they can disproportionately influence the model's fit even if they don't have large residuals. 
+
+```{r}
+hat_values <- hatvalues(model_1)  
 ```
 
+```{r}
+n <- length(hat_values)
+expected_quantiles <- qnorm((1:n + n - 1/8) / (2*n + 1/2))
+
+ggplot(data = NULL, aes(x = expected_quantiles, y = sort(hat_values))) +
+  geom_point(color = "steelblue", size = 2) +
+  geom_abline(slope = max(hat_values) / max(expected_quantiles), 
+              intercept = 0, 
+              linetype = "dashed", color = "red") +
+  labs(
+    x = "Theoretical Quantiles (Half-Normal)",
+    y = "Observed Hat Values (Leverage)",
+    title = "Half-Normal Plot of Leverage",
+    subtitle = "Points above the red line are high-leverage outliers"
+  ) +
+  theme_minimal()
+```
+
+We are able to see from the Half-Normal Plot of the Leverage that most of the points fall along or below the red reference line (reference for expected behavior/ideal fit), suggesting normal leverage behavior. However, we are also able to observe points that are well above the line which deviates from expectations and represent unusual/influential predictor combinations (towards the right hand end of the plot). Therefore, we are able to conclude that there are potential high-leverage outliers that could disproportionately affect the model's coefficients. These high leverage counties have unusually large influence due to their unique combinations of predictor values. 
+
+```{r}
+leverage_analysis <- data.frame(
+  county = county_data$county,
+  state = county_data$state,
+  hat_value = hatvalues(model_1) 
+)
+
+p <- length(coef(model_1)) - 1  
+n <- nrow(county_data)
+leverage_threshold <- (2 * p) / n
+
+high_leverage_outliers <- leverage_analysis %>%
+  mutate(high_leverage = ifelse(hat_value > leverage_threshold, "Yes", "No")) %>%
+  filter(high_leverage == "Yes") %>%
+  arrange(desc(hat_value))  
+
+print(high_leverage_outliers[, c("county", "state", "hat_value")])
+```
+
+From the table above, we flagged the high-leverage points by creating a threshold of 2*mean(hat_values) to specifically define the high leverage observations. The counties that exceed this threshold are filtered and shown in the output table above where the top high leverage counties (ranked by their hat values form a binomial logistic regression model) are listed at the top. We are able to observe that counties such as District of Columbia, New York, Clark, Los Angeles, Honolulu, etc are flagged as the highest leverae observations meaning that their combinations of predictor variables are atypical compared to other counties. It is also important to note that most of these counties are urban centers/state capitals which may explain why they are outliers in the predictor space (population density, public heatlh access, etc). 
 
 ### Q1.10 (10pts)
 
 Find the best sub-model using the AIC criterion.
-```{r}
 
+**Solution ** 
+To identify the optimal subset of predictors from the binomial logistic regression model, we will utilize stepwise selection with AIC which balances the model fit and the complexity, favoring models with fewer predictors. 
+
+```{r}
+best_model <- stepAIC(
+  model_1,
+  direction = "both", 
+  trace = FALSE       
+)
 ```
 
+```{r}
+full_formula <- formula(model_1)
+full_aic <- AIC(model_1)
+
+best_formula <- formula(best_model)
+best_aic <- AIC(best_model)
+
+cat("FULL MODEL:\n")
+print(full_formula)
+cat("AIC:", full_aic, "\n\n")
+
+cat("BEST MODEL (by AIC):\n")
+print(best_formula)
+cat("AIC:", best_aic, "\n")
+cat("Difference in AIC:", best_aic - full_aic, "\n")
+
+library(dplyr)
+comparison <- data.frame(
+  Model = c("Full", "Best"),
+  Predictors = c(
+    paste(length(attr(terms(model_1), "term.labels")), "predictors"),
+    paste(length(attr(terms(best_model), "term.labels")), "predictors")
+  ),
+  AIC = c(full_aic, best_aic)
+)
+print(comparison)
+```
+
+```{r}
+summary(best_model)
+```
+
+After running stepwise selection AIC, we are able to see that the AIC of the full model is 3880.648. The AIC for the best model is 3870.062. Because the AIC for the reduced model Therefore, we are able to conclude that the model with the following predictors are the
+    
 
 ### Q1.11 (15pts)
 
 Find the best sub-model using the lasso with cross validation.
-```{r}
 
+```{r}
+# Define predictors (X) and response (Y)
+x <- model.matrix(~ . - county - confirmed - deaths, data = county_data)[, -1]  # Exclude intercept
+y <- cbind(deaths = county_data$deaths, survivors = county_data$confirmed - county_data$deaths)
+
+# Standardize predictors (critical for LASSO)
+x_scaled <- scale(x)  # Centers & scales to mean=0, sd=1
+```
+
+```{r}
+# 10-fold cross-validation to find optimal lambda
+set.seed(123)  # For reproducibility
+cv_lasso <- cv.glmnet(
+  x = x_scaled,
+  y = y,
+  family = "binomial",  # For logistic regression
+  alpha = 1,           # alpha=1 for LASSO (0 for Ridge)
+  type.measure = "deviance",  # Uses deviance for binomial
+  nfolds = 10          # Number of cross-validation folds
+)
+```
+
+```{r}
+# Lambda that minimizes deviance (best model)
+lambda_min <- cv_lasso$lambda.min
+
+# Lambda for most parsimonious model within 1 SE of minimum
+lambda_1se <- cv_lasso$lambda.1se
+
+# Plot cross-validation results
+plot(cv_lasso)
+```
+
+```{r}
+# Coefficients at lambda.1se (more conservative selection)
+coef_lasso <- coef(cv_lasso, s = "lambda.1se")
+
+# Get non-zero coefficients (selected predictors)
+selected_vars <- rownames(coef_lasso)[which(coef_lasso != 0)][-1]  # Exclude intercept
+print(selected_vars)
+```
+
+```{r}
+# Refit with selected predictors (for interpretability)
+best_submodel <- glm(
+  cbind(deaths, confirmed - deaths) ~ perce,
+  family = binomial,
+  data = county_data
+)
+
+# Summary of the final model
+summary(best_submodel)
 ```
 
 ## Q2. Odds ratios (20pts)
@@ -477,6 +672,24 @@ $$
 $$
 Show that $\log \phi$ is constant over all tables if $\beta_1 = \beta_2$.
 
+
 ## Q3. ELMR Chapter 4 Excercise 3 (30pts)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
