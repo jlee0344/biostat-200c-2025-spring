@@ -1,7 +1,7 @@
 ---
 title: "Biostat 200C Homework 2"
 subtitle: Due Apr 25 @ 11:59PM
-date: April 15, 2025
+date: today
 format:
   html:
     theme: cosmo
@@ -27,17 +27,6 @@ knitr::opts_chunk$set(echo = TRUE, cache = FALSE)
 
 To submit homework, please upload both Rmd and html files to Bruinlearn by the deadline.
 
-```{r}
-library(car)
-library(dplyr)
-library(knitr)
-library(tidyverse) 
-library(ggplot2)
-library(MASS)
-library(glmnet)
-```
-
-
 ## Q1. CFR of COVID-19 (90pts)
 
 Of primary interest to public is the risk of dying from COVID-19. A commonly used measure is case fatality rate/ratio/risk (CFR), which is defined as
@@ -57,15 +46,19 @@ In this exercise, we use logistic regression to study how US county-level CFR ch
 ### Sample code for data preparation
 
 Load the `tidyverse` package for data manipulation and visualization.
-
 ```{r}
 # tidyverse of data manipulation and visualization
 library(tidyverse)
+library(dplyr) 
+library(car)
+library(tibble) 
+library(MASS)
+library(glmnet)
 ```
-Read in the data of COVID-19 cases reported on 2020-04-04.
 
+Read in the data of COVID-19 cases reported on 2020-04-04.
 ```{r}
-county_count <- read_csv("/Users/julielee/Downloads/04-04-2020.csv.gz") %>%
+county_count <- read_csv("~/Downloads/04-04-2020.csv.gz") %>%
   # cast fips into dbl for use as a key for joining tables
   mutate(FIPS = as.numeric(FIPS)) %>%
   filter(Country_Region == "US") %>%
@@ -77,6 +70,7 @@ names(county_count) <- str_to_lower(names(county_count))
 ```
 
 Sanity check by displaying the unique US states and territories:
+
 ```{r}
 county_count %>%
   select(province_state) %>%
@@ -84,9 +78,7 @@ county_count %>%
   arrange(province_state) %>%
   print(n = Inf)
 ```
-
 We want to exclude entries from `Diamond Princess`, `Grand Princess`, `Guam`, `Northern Mariana Islands`, `Puerto Rico`, `Recovered`, and `Virgin Islands`, and only consider counties from 50 states and DC.
-
 ```{r}
 county_count <- county_count %>%
   filter(!(province_state %in% c("Diamond Princess", "Grand Princess", 
@@ -94,9 +86,7 @@ county_count <- county_count %>%
                                  "Puerto Rico", "Virgin Islands"))) %>%
   print(width = Inf)
 ```
-
 Graphical summarize the COVID-19 confirmed cases and deaths on 2020-04-04 by state.
-
 ```{r}
 county_count %>%
   # turn into long format for easy plotting
@@ -112,9 +102,8 @@ county_count %>%
 ```
 
 Read in the 2020 county-level health ranking data.
-
 ```{r}
-county_info <- read_csv("/Users/julielee/Downloads/us-county-health-rankings-2020.csv.gz") %>%
+county_info <- read_csv("~/Downloads/us-county-health-rankings-2020.csv.gz") %>%
   filter(!is.na(county)) %>%
   # cast fips into dbl for use as a key for joining tables
   mutate(fips = as.numeric(fips)) %>%
@@ -169,37 +158,29 @@ For stability in estimating CFR, we restrict to counties with $\ge 5$ confirmed 
 county_count <- county_count %>%
   filter(confirmed >= 5)
 ```
-
 We join the COVID-19 count data and county-level information using FIPS (Federal Information Processing System) as key. 
-
 ```{r}
 county_data <- county_count %>%
   left_join(county_info, by = "fips") %>%
   print(width = Inf)
 ```
 Numerical summaries of each variable:
-
 ```{r}
 summary(county_data)
 ```
-
 List rows in `county_data` that don't have a match in `county_count`:
-
 ```{r}
 county_data %>%
   filter(is.na(state) & is.na(county)) %>%
   print(n = Inf)
 ```
-
 We found there are some rows that miss `fips`. 
-
 ```{r}
 county_count %>%
   filter(is.na(fips)) %>%
   select(fips, admin2, province_state) %>%
   print(n = Inf)
 ```
-
 We need to (1) manually set the `fips` for some counties, (2) discard those `Unassigned`, `unassigned` or `Out of`, and (3) try to join with `county_info` again.
 ```{r}
 county_data <- county_count %>%
@@ -224,13 +205,10 @@ county_data <- county_count %>%
   left_join(county_info, by = "fips") %>%
   print(width = Inf)
 ```
-
 Summarize again
-
 ```{r}
 summary(county_data)
 ```
-
 If there are variables with missing value for many counties, we go back and remove those variables from consideration.
 
 Let's create a final data frame for analysis.
@@ -240,7 +218,6 @@ county_data <- county_data %>%
   select(county, confirmed, deaths, state, percent_fair_or_poor_health:percent_rural)
 summary(county_data)
 ```
-
 Display the 10 counties with highest CFR.
 ```{r}
 county_data %>%
@@ -249,13 +226,10 @@ county_data %>%
   arrange(desc(cfr)) %>%
   top_n(10)
 ```
-
 Write final data into a csv file for future use.
-
 ```{r}
-write_csv(county_data, "/Users/julielee/Downloads/covid19-county-data-20200404.csv.gz")
+write_csv(county_data, "~/Downloads/covid19-county-data-20200404.csv.gz")
 ```
-
 ### Note:
 
 Given that the datasets were collected in the middle of the pandemic, what assumptions of CFR might be violated by defining CFR as `deaths/confirmed` from this data set? 
@@ -277,7 +251,7 @@ Read and run above code to generate a data frame `county_data` that includes cou
 Displayed below is a generated data frame 'county_data' that includes county-level COVID-19 confirmed cases and deaths, demographic, and health related information. We are able to see that there are 1446 rows and 31 columns. 
 
 ```{r}
-county_data <- read_csv("/Users/julielee/Downloads/covid19-county-data-20200404.csv.gz") %>%
+county_data <- read_csv("~/Downloads/covid19-county-data-20200404.csv.gz") %>%
   print(width = Inf)
 ```
 
@@ -341,7 +315,7 @@ coef_table
 
 ### Q1.4 (10pts)
 
-The interpretation of the top 3 significant predictors with p-value <0.05: 
+Interpret the regression coefficients of 3 significant predictors with p-value <0.05.
 
 **Solution ** 
 
@@ -352,15 +326,15 @@ significant_predictors <- coef_table %>%
   filter(`Pr(>|z|)` < 0.05 & rownames(coef_table) != "(Intercept)") %>%
   arrange(`Pr(>|z|)`)
 
-top_5_predictors <- head(significant_predictors, 3)
+top_5_predictors <- head(significant_predictors, 5)
 print(top_5_predictors)
 ```
 
 The top 3 most signficiant predictors and their corresponding interpretations are: 
 
-1. **percent_homeowners**: (Regression coefficient: -0.03398152 with a p-value of 3.217538e-08. Interpretation: A one percent increase in the homeownership rate is associated with a 0.03398152 decrease in the log-odds of COVID-19 deaths, holding all other predictors constants. In other words, a one percent increase in the homeownership rate is associated with a decrease in the odds of COVID-19 deaths by 3.3 percent, holding all other predictors constant. We are able to say that communities with high homeownership rates showed significantly lower COVID-18 mortality. 
+1. **percent_homeowners**: (Regression coefficient: -0.03398152 with a p-value of 3.217538e-08. Interpretation: A one percent increase in the homeownership rate is associated with a 0.03398152 decrease in the log-odds of COVID-19 deaths, holding all other predictors constants. In other words, a one percent increase in the homeownership rate is associated with a decrease in the odds of COVID-19 deaths by 3.3 percent, holding all other predictors constant. We are able to say that counties with high homeownership rates showed significantly lower COVID-19 mortality. 
 
-2. **stateVirginia**: (Regression coefficient: -1.53273214) with a p-value of 1.416288e-06. Interpretation: Compared to the reference state, Virginia has 78 percent lower odds of COVID-19 death. Therefore, we are able to conclude that Virginia's COVID-19 outcomes were significantly better than the reference state. 
+2. **percent_severe_housing_problems**: (Regression coefficient: -0.04473908) with a p-value of 3.207828e-05. Interpretation: A one percent increase in severe housing problems is associated with a 0.04473 decrease in the log-odds of COVID-19 deaths, holding all other predictors constant. In other words, a one percent increase in the severe housing problems is associated with a decrease in the odds of COVID-19 deaths by 4.37 percent, holding all other predictors constant. We are able to say that counties with high severe housing problems showed significantly lower COVID-19 mortality. 
 
 3. **percent_insufficient_sleep**: (Regression coefficient: 0.04437542) with a p-value of 8.121630e-06. Interpretation: A one percent increase in the percentage of people who do not get enough sleep is associated with a 0.04437 increase in the log odds of COVID-19 deaths, holding all other predictors constant. in other words, a one percent increase in sleep-derived population is associated with an increase in the odds of COVID-19 deaths by 4.5 percent, holding all other predictor constant. We are able to say that sleep derprivation appears to be a significant risk factor associated with COVID-19 deaths.  
 
@@ -392,7 +366,7 @@ cat("Goodness-of-fit p-value:", p_value)
 
 Effect Size: Pseudo R^2: We will next quantify the variance explained by the McFadden's pseudo-R^2. We are able to conclude that the predictors explain around 43.433 percent of the deviance which indicates moderate to strong explanatory power. 
 
-```{r}
+```{r, warning = FALSE}
 library(pscl)
 pseudo_r2 <- 1 - (model_1$deviance / model_1$null.deviance)
 cat("Pseudo-R²:", pseudo_r2)
@@ -424,7 +398,7 @@ Construct confidence intervals of regression coefficients.
 **Solution ** 
 In order to compute the confidence intervals for the regression coefficients in the binomial logistic regression model, we will utilize the confint() function. The results below showcase the lower and upper bounds of the coefficients at a specified confidence level (95 percent). 
 
-```{r}
+```{r, warning = FALSE}
 confint(model_1)  
 confint.default(model_1)  
 ```
@@ -469,7 +443,6 @@ analysis_df <- data.frame(
   state = county_data$state,
   deaths = county_data$deaths, 
   confirmed = county_data$confirmed
-  
 )
 
 outliers_df <- analysis_df %>% 
@@ -489,7 +462,7 @@ Plot the half-normal plot. Are there potential outliers in predictor space?
 In order to identify potential outliers in the predictor space (unusual combinations of predictor variables), we created a half normal plot of the hat values (leverage) from the binomial logistic regression model created. These hat values measure how far each observation's predictor values are from the average predictor values in the dataset. Identifying high leverage points is essential as they can disproportionately influence the model's fit even if they don't have large residuals. 
 
 ```{r}
-hat_values <- hatvalues(model_1)  
+hat_values <- hatvalues(model_1)
 ```
 
 ```{r}
@@ -538,6 +511,7 @@ From the table above, we flagged the high-leverage points by creating a threshol
 Find the best sub-model using the AIC criterion.
 
 **Solution ** 
+
 To identify the optimal subset of predictors from the binomial logistic regression model, we will utilize stepwise selection with AIC which balances the model fit and the complexity, favoring models with fewer predictors. 
 
 ```{r}
@@ -580,7 +554,7 @@ print(comparison)
 summary(best_model)
 ```
 
-After running stepwise selection AIC, we are able to see that the AIC of the full model is 3880.648. The AIC for the best model is 3870.062. Because the AIC for the reduced model Therefore, we are able to conclude that the model with the following predictors are the
+After running stepwise selection AIC, we are able to see that the AIC of the full model is 3880.648. The AIC for the best model is 3870.062. Because the AIC for the reduced model is less than the AIC for the full model, we are able to conclude that the model with 21 predictors is better than the full model with 28 predictors. The listed predictors for the reduced model are: state + percent_fair_or_poor_health + percent_smokers + percent_excessive_drinking + percent_uninsured +percent_some_college + percent_unemployed + percent_children_in_poverty + percent_single_parent_households + percent_severe_housing_problems +  percent_adults_with_diabetes + percent_food_insecure + percent_insufficient_sleep + percent_uninsured_2 + median_household_income + percent_homeowners + population_2 + percent_less_than_18_years_of_age + percent_black + percent_hispanic + percent_female.  
     
 
 ### Q1.11 (15pts)
@@ -588,58 +562,71 @@ After running stepwise selection AIC, we are able to see that the AIC of the ful
 Find the best sub-model using the lasso with cross validation.
 
 ```{r}
-# Define predictors (X) and response (Y)
-x <- model.matrix(~ . - county - confirmed - deaths, data = county_data)[, -1]  # Exclude intercept
-y <- cbind(deaths = county_data$deaths, survivors = county_data$confirmed - county_data$deaths)
+x <- model.matrix(
+  ~ . - county - confirmed - deaths,  
+  data = county_data
+)[, -1] 
 
-# Standardize predictors (critical for LASSO)
-x_scaled <- scale(x)  # Centers & scales to mean=0, sd=1
-```
-
-```{r}
-# 10-fold cross-validation to find optimal lambda
-set.seed(123)  # For reproducibility
-cv_lasso <- cv.glmnet(
-  x = x_scaled,
-  y = y,
-  family = "binomial",  # For logistic regression
-  alpha = 1,           # alpha=1 for LASSO (0 for Ridge)
-  type.measure = "deviance",  # Uses deviance for binomial
-  nfolds = 10          # Number of cross-validation folds
+y <- cbind(
+  deaths = county_data$deaths,
+  survivors = county_data$confirmed - county_data$deaths
 )
 ```
 
-```{r}
-# Lambda that minimizes deviance (best model)
-lambda_min <- cv_lasso$lambda.min
 
-# Lambda for most parsimonious model within 1 SE of minimum
+```{r}
+set.seed(123)  
+cv_lasso <- cv.glmnet(
+  x = x, 
+  y = y,
+  family = "binomial",  
+  alpha = 1,           
+  type.measure = "deviance",  
+  nfolds = 10         
+)
+```
+
+The two key lambda values that are calculated are: 
+1. lambda.min: Minimizes prediction error 
+2. lambda.1se: Largest lambda value withiin 1 standard error of the minimum (simpler model) 
+
+```{r}
+lambda_min <- cv_lasso$lambda.min
 lambda_1se <- cv_lasso$lambda.1se
 
-# Plot cross-validation results
-plot(cv_lasso)
+cat("Lambda (min error):", lambda_min, "\n")
+cat("Lambda (1se rule):", lambda_1se)
 ```
 
-```{r}
-# Coefficients at lambda.1se (more conservative selection)
-coef_lasso <- coef(cv_lasso, s = "lambda.1se")
+1. Predictors from the Most Accurate Model (using lambda.min) 
 
-# Get non-zero coefficients (selected predictors)
-selected_vars <- rownames(coef_lasso)[which(coef_lasso != 0)][-1]  # Exclude intercept
-print(selected_vars)
+```{r}
+coef_min <- coef(cv_lasso, s = "lambda.min")
+selected_vars_min <- rownames(coef_min)[which(coef_min != 0)][-1]  
+print(selected_vars_min)
 ```
 
+2. Predictors from the Simpler Model (using lambda.1se) 
+
 ```{r}
-# Refit with selected predictors (for interpretability)
-best_submodel <- glm(
-  cbind(deaths, confirmed - deaths) ~ perce,
+coef_1se <- coef(cv_lasso, s = "lambda.1se")
+selected_vars_1se <- rownames(coef_1se)[which(coef_1se != 0)][-1]
+print(selected_vars_1se)
+```
+
+The model with LASSO regularization (from both lambda values) comes out to have no predictor variables besides the intercept. Therefore, we refit the binomial logistic regression model with no predictors. It is possible the LASSO regression did not select any of the predictors for the logistic model because LASSO's penalty term (lambda values) were so strong that it forced all the predictor coefficients to exactly 0 (extreme regularization). In addition, it is also possible that one or more of the predictors perfectly predict the outcome, making the logisitc regression unstable. For future exploration, it is vital that we check data issues including perfect separation and scaling, reassess predictor relevance, and try weaker penalties or alternative methods. 
+
+```{r}
+null_model <- glm(
+  cbind(deaths, confirmed - deaths) ~ 1, 
   family = binomial,
   data = county_data
 )
 
-# Summary of the final model
-summary(best_submodel)
+summary(null_model)
 ```
+
+The AIC score of the model with only intercepts is 5141.6 which is significantly higher than that of the the sub-model chosen from the stepwise selection AIC method. 
 
 ## Q2. Odds ratios (20pts)
 
@@ -663,6 +650,7 @@ $$
 \pi_i = \frac{e^{\beta_i}}{1 + e^{\beta_i}}, 
 $$
 show that if there is no difference between the exposed and not exposed groups (i.e., $\beta_1 = \beta_2$), then $\phi = 1$.
+
 
 ### Q2.2(10pts)
 
