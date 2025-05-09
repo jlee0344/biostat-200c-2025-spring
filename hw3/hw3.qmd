@@ -1,0 +1,102 @@
+---
+title: "Biostat 200C Homework 3"
+subtitle: Due May 9 @ 11:59PM
+date: today
+format:
+  html:
+    theme: cosmo
+    embed-resources: true
+    number-sections: true
+    toc: true
+    toc-depth: 4
+    toc-location: left
+    code-fold: false
+engine: knitr
+knitr:
+  opts_chunk: 
+    fig.align: 'center'
+    # fig.width: 6
+    # fig.height: 4
+    message: FALSE
+    cache: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = FALSE)
+```
+
+## Q3. ELMR Chapter 5 Exercise 5 (page 100) (70pts)
+
+The ships dataset found in the MASS package gives the number of wave damage incidents and aggregate months of service for different types of ships broken down by year of construction and period of operation.
+
+(a) (5pts) Examine the data for the period of operation 1960–1974 for ships constructed in the years 1975–1979. Why are there no damage incidents?
+
+**Solution ** 
+
+```{r}
+
+```
+
+
+(b) (5pts) Make a two-way table that shows the rate of damage incidents per 1000 months of aggregate service classified by type and year of construction. Comment on the table.
+
+**Solution ** 
+
+```{r}
+
+```
+
+
+(c) (10pts) Compute the rate of damage incidents per year for all cases where some service was recorded.
+
+**Solution ** 
+ 
+```{r}
+
+```
+
+
+(d) (10pts) Fit linear models with the observed rate of damage incidents as the response and the following three combinations of predictors: (i) All two-way interactions, (ii) main effects terms only, (iii) null (no predictors). Make sure year is treated as a factor rather than numerical variable. Which of these three models is preferred?
+
+**Solution ** 
+
+```{r}
+
+```
+
+(e) (10pts) Fit a Poisson response model for the number of incidents with the predictors: log of service, type, year and period. Test whether the parameter associated with the service term can be one. Explain why we are interested in such a test.
+
+**Solution ** 
+
+```{r}
+
+```
+
+
+(f) (5pts) Fit the Poisson rate model with all two-way interactions of the three predictors. Does this model fit the data?
+
+**Solution ** 
+
+```{r}
+
+```
+
+
+(g) (10pts) Check the residuals. Are there any outliers? Plot residuals against the fitted values. Investigate any unusual features of this plot.
+
+
+```{r}
+
+```
+
+
+
+
+(h) (15pts) Now fit the rate model with just the main effects and compare it to the interaction model. Which model is preferred?
+
+```{r}
+
+```
+
+ 
+ 
