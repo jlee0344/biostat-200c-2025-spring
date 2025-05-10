@@ -32,9 +32,13 @@ library(dplyr)
 library(faraway)
 library(ggplot2)
 library(knitr) 
+library(patchwork)
+```
+```{r}
+data(dvisits)
 ```
 
-**NOTE: Questions other than Question 3 (using the ELMR book) are attached to the PDF. 
+**NOTE: Questions other than Question 3 (using the ELMR book) are attached to the end of the PDF document. 
 
 ## Q3. ELMR Chapter 5 Exercise 5 (page 100) (70pts)
 
@@ -48,6 +52,14 @@ The dvisits data comes from the Australian Health Survey of 1977–1978 and cons
 The scatter plot with a smoothed LOESS curve illustrates the relationship between age and the number of doctor visits (doctorco). The overall trend indicates a slight positive association, suggesting that as individuals age, the number of doctor visits tends to increase (by slightly). The plot reveals that most data points are concentrated at lower visit counts (primarily 0 and 1), indicating that a significant portion of the sample reports few or no doctor visits, regardless of age. The red smoothed line shows a gradual upward trend, particularly in the higher age range, suggesting that older individuals may utilize healthcare services slightly more frequently. This pattern is consistent with expectations, as age is typically associated with greater health concerns and increased medical needs.
 
 ```{r}
+dvisits <- dvisits %>%
+mutate(age_group = cut(age*100, breaks = c(15, 25, 35, 45, 55, 65, 75),
+labels = c("15-24", "25-34", "35-44", "45-54", "55-64",
+"65+")))
+```
+
+
+```{r}
 ggplot(dvisits, aes(x = age, y = doctorco)) +
   geom_jitter(alpha = 0.4, color = "darkblue", width = 0.01, height = 0.1) +
   geom_smooth(method = "loess", color = "red", se = TRUE) +
@@ -59,8 +71,24 @@ ggplot(dvisits, aes(x = age, y = doctorco)) +
   theme_minimal()
 ```
 
+```{r}
+age_summary <- dvisits %>%
+  group_by(age_group) %>%
+  summarise(mean_visits = mean(doctorco, na.rm = TRUE))
+
+ggplot(age_summary, aes(x = age_group, y = mean_visits)) +
+  geom_bar(stat = "identity", fill = "lightsteelblue") +
+  labs(
+    title = "Mean Number of Doctor Visits by Age Category",
+    x = "Age Category",
+    y = "Mean Doctor Visits"
+  ) +
+  theme_minimal()
+```
+
 2. Plot for Doctor Visits by Illness Level: 
 We created a boxplot that categorizes individuals based on their illness level (ranging from 0 to 5) and displays the distribution of doctor visits within each category. As the illness level increases, the median number of doctor visits also rises slightly, and the variability in visit frequency becomes more pronounced. Individuals with higher illness levels exhibit a broader range of doctor visit counts, including a few outliers with exceptionally high usage. This pattern supports the hypothesis that illness burden is positively associated with medical service utilization. Specifically, individuals at illness levels 4 and 5 not only have higher median visit counts but also display greater variability, which may indicate more complex or diverse health conditions that require varying degrees of medical attention.
+
 
 ```{r}
 ggplot(dvisits, aes(x = factor(illness), y = doctorco)) +
@@ -73,54 +101,69 @@ ggplot(dvisits, aes(x = factor(illness), y = doctorco)) +
   theme_minimal()
 ```
 
-(b) Combine the predictors chcond1 and chcond2 into a single three-level factor. Make an appropriate plot showing the relationship between this factor and the response. Comment.
-
-**Solution **
-
-We combined the predictors chcond1 and chcond2 into a single three-level factor called chronic_combo. The boxplot below visualizes the distribution of the number of doctor visits across two categories of chronic condition status: "None" and "One", where each category represents whether individuals have no chronic conditions or exactly one (based on the combination of chcond1 and chcond2).
-
-In the "None" group, most individuals with no chronic condition report zero doctor visits. The box is compressed near the zero line, with only a few outliers above zero. This suggests that people without chronic health issues largely avoid visiting a doctor.
-
-In contrast, the "One" group shows a higher median number of doctor visits compared to the "None" group. The interquartile range (the height of the box) is wider, indicating greater variability, and more data points are distributed above the median. Several outliers with relatively high visit counts are also present, suggesting that even individuals with a single chronic condition may require frequent medical attention.
-
-Overall, the boxplot clearly demonstrates a positive association between having a chronic condition and the number of doctor visits. In other words, having at least one chronic condition increases the likelihood of more frequent medical service utilization. This is evident from both the higher central tendency and the broader distribution in the "One" category.
-
-The plot also highlights low healthcare utilization among healthy individuals. The strong clustering at zero visits for the "None" group suggests that healthy individuals may have minimal interaction with healthcare providers, likely limited to preventive checkups or occasional needs.
-
-Lastly, we observe that there are no entries for the "Both" category, which would represent individuals with both chcond1 and chcond2. This indicates that in the current dataset, individuals either do not have any chronic conditions or have exactly one, with no cases of individuals having both.
-
 ```{r}
-dvisits$chronic_combo <- with(dvisits,
-  factor(
-    ifelse(chcond1 == 1 & chcond2 == 1, "Both",
-           ifelse(chcond1 == 1 | chcond2 == 1, "One", "None")),
-    levels = c("None", "One", "Both")
-  )
-)
-```
+illness_visits_summary <- dvisits %>%
+  group_by(illness) %>%
+  summarise(avg_visits = mean(doctorco, na.rm = TRUE))
 
-```{r}
-ggplot(dvisits, aes(x = chronic_combo, y = doctorco)) +
-  geom_boxplot(fill = "lightcoral", color = "black") +
+ggplot(illness_visits_summary, aes(x = factor(illness), y = avg_visits)) +
+  geom_bar(stat = "identity", fill = "coral") +
   labs(
-    title = "Doctor Visits by Number of Chronic Conditions",
-    x = "Chronic Condition Status",
-    y = "Number of Doctor Visits"
+    title = "Mean Number of Doctor Visits per Illness Level",
+    x = "Illness Level",
+    y = "Mean Doctor Visits"
   ) +
   theme_minimal()
 ```
 
+(b) Combine the predictors chcond1 and chcond2 into a single three-level factor. Make an appropriate plot showing the relationship between this factor and the response. Comment.
+
+**Solution **
+
+We combined two different binary indicators, chcond1 and chcond2, to create a new categorical variable, chronic_combo, which reflects the chronic condition status. The new variable has three levels: 1. "no_condition": individuals with neither condition, 2. "condition_without_limit": individuals with a chronic condition but no activity limitation, and 3. "condition_with_limit": individuals with a chronic condition that limits activity. The boxplot below illustrates the distribution of the number of doctor visits across these three groups. We see that there is a clear increase in visits with activity limitation: the group "condition_with_limit" shows a visibly higher median and a wider interquartile range of doctor visits compared to the other two groups. There are also several outliers with frequent visits, suggesting that activity-limiting chronic conditions are strongly associated with higher healthcare utilization. There are minimal visits for those without conditions: individuals in the "no_condition" and "condition_without_limit" categories have doctor visit distributions tightly clustered around 0, which suggests that the presence of a chronic condition alone may not significantly increase the number of doctor visits. The "condition_with_limit" group shows more variability in doctor visits.
+
+```{r}
+dvisits <- dvisits %>%
+  mutate(chronic_combo = case_when(
+    chcond1 == 0 & chcond2 == 0 ~ "no_conditions",
+    chcond1 == 1 & chcond2 == 0 ~ "condition_without_limit",
+    chcond1 == 0 & chcond2 == 1 ~ "condition_with_limit",
+    TRUE ~ NA_character_
+  ))
+
+dvisits$chronic_combo <- factor(dvisits$chronic_combo,
+                                levels = c("no_conditions", "condition_without_limit", "condition_with_limit"))
+
+dvisits <- dvisits %>%
+  mutate(doctor_visits_capped = ifelse(doctorco >= 5, 5, doctorco),
+         doctor_visits_capped = factor(doctor_visits_capped,
+                                       levels = 0:5,
+                                       labels = c("0", "1", "2", "3", "4", "5+")))
+
+ggplot(dvisits, aes(x = chronic_combo, y = doctorco)) +
+  geom_boxplot(fill = "steelblue") +
+  scale_y_continuous(breaks = 0:6, labels = c("0", "1", "2", "3", "4", "5", "5+")) +
+  labs(
+    title = "Doctor Visit Counts by Chronic Condition Category",
+    x = "Chronic Condition (chronic_combo)",
+    y = "Number of Doctor Visits"
+  ) +
+  theme_minimal()
+
+```
+
+
 (c) Build a Poisson regression model with doctorco as the response and sex, age, agesq, income, levyplus, freepoor, freerepa, illness, actdays, hscore and the three-level condition factor as possible predictor variables. Considering the deviance of this model, does this model fit the data?
 
 **Solution ** 
-The Poisson regression model below fitted the doctorco (number of doctor visits) as the response variable and a set of predictors including sex, age, agesq, income, levyplus, freepoor, freerepa, illness, actdays, hscore and the three-level condition factor (chronic_combo) as possible predictor variables. The model summary is showcased below. We assess the model fit using the residual deviance, which represents the goodness of fit test statistic that assess how well the model predicts the observed outcomes in comparison to the performance of the saturated model. The residual deviance is calculated as: 2* log likelihood of the saturated model - 2*log likelihood of the fitted model. The residual deviance of this fitted model comes out to be 4379.7  on 5178  degrees of freedom. The residual deviance (4379.7) is much lower than the null deviance (5634.8). The deviance to degrees of freedom ratio (4379.7/5178 = 0.846) is close to 1 which indicates that the Poisson model's assumption of mean = variance is plausible. The 0.846 ratio is slightly below 1, which suggests possible underdispersion (less variability than expected under the Poisson distribution). However, we can conclude that the model fits reasonably well, as predictors significantly explain variability (large drop in deviance from the null model). In addition, there no indication of severe overdispersion, but slight underdispersion which suggests that the Poisson model may be acceptable. 
+
+The Poisson regression model below fitted the doctorco (number of doctor visits) as the response variable and a set of predictors including sex, age, agesq, income, levyplus, freepoor, freerepa, illness, actdays, hscore and the three-level condition factor (chronic_combo) as possible predictor variables. The model summary is showcased below. We assess the model fit using the residual deviance, which represents the goodness of fit test statistic that assess how well the model predicts the observed outcomes in comparison to the performance of the saturated model. The residual deviance is calculated as: 2* log likelihood of the saturated model - 2*log likelihood of the fitted model. The residual deviance of this fitted model comes out to be 4379.5  on 5177 degrees of freedom. The residual deviance (4379.5) is much lower than the null deviance (5634.8). The deviance to degrees of freedom ratio (4379.5/5177 = 0.846) is close to 1 which indicates that the Poisson model's assumption of mean = variance is plausible. The 0.846 ratio is slightly below 1, which suggests possible underdispersion (less variability than expected under the Poisson distribution). However, we can conclude that the model fits reasonably well, as predictors significantly explain variability (large drop in deviance from the null model). In addition, there no indication of severe overdispersion, but slight underdispersion which suggests that the Poisson model may be acceptable. 
 
 ```{r}
 model_pois <- glm(doctorco ~ sex + age + I(age^2) + income + levyplus + 
                   freepoor + freerepa + illness + actdays + hscore + 
                   chronic_combo,
                   data = dvisits, family = poisson)
-
 ```
 
 ```{r}
@@ -168,10 +211,10 @@ qqline(residuals_dev, col = "blue")
 (e) Use a stepwise AIC-based model selection method. What sort of person would be predicted to visit the doctor the most under your selected model?
 
 **Solution ** 
-The stepwise AIC-based model selection method was applied to the initial Poisson regression model. The resulting model includes the following predictors: sex, age, income, illness, levyplus, freepoor, actays, hscore, and chronic_combo. The final model has a residual deviance of 4381.3 on 5180 degrees of freedom, with a AIC score of 6732.8. 
+The stepwise AIC-based model selection method was applied to the initial Poisson regression model. The resulting model includes the following predictors: sex, age, income, illness, levyplus, freepoor, actays, hscore, and chronic_combo. The final model has a residual deviance of 4381.0 on 5179 degrees of freedom, with a AIC score of 6734.53.
 
 The sort of person that would be predicted to visit the doctor the most under the selected model would have the following characterisitics: 
-1. Female (the sex coefficient is positive and highly significant): women are predicted to visit the doctor more often than men. In more technical terms, being female is associated with an increase in the log of the expected number of doctor visits by 0.160, compared to being male, holding all other predictors constant.
+1. Female (the sex coefficient is positive and highly significant): women are predicted to visit the doctor more often than men. In more technical terms, being female is associated with an increase in the log of the expected number of doctor visits by 0.162, compared to being male, holding all other predictors constant.
 2. Older (age is positive and significant): Age is positively associated with the log of the expected number of doctor visits, meaning that as age increases, the expected number of visits also increases, holding all other variables constant.
 3. Low Income (income has a negative coefficient and slightly significant): Lower income is associated with a higher log of the expected number of doctor visits, holding all other variables constant.
 4. Not covered by freepoor program (freepoor is negative and significant): Individuals who are not covered by the government due to low income, recent immigration status, or unemployment (i.e., not enrolled in the freepoor program) are associated with a higher log expected number of doctor visits, compared to those who are covered, holding all other variables constant.
@@ -192,7 +235,7 @@ summary(model_step)
 
 **Solution ** 
 
-Based on the Poisson regression model, the predicted number of doctor visits for the last person in the dataset is centered around zero visits. The model estimates an 85.91% probability that this person will not visit the doctor at all, followed by a 13.05% chance of making exactly one visit. The probabilities for two or more visits drop off sharply, with only a 0.99% chance of two visits, and even lower probabilities after the number of visits hit 3 visits. This distribution indicates that the individual has a very low expected rate of doctor visits. The highly right-skewed distribution is typical in Poisson models for count data, especially when the mean count is close to zero.
+Based on the Poisson regression model, the predicted number of doctor visits for the last person in the dataset is centered around zero visits. The model estimates an 85.89% probability that this person will not visit the doctor at all, followed by a 13.06% chance of making exactly one visit. The probabilities for two or more visits drop off sharply, with only a 0.99% chance of two visits, and even lower probabilities after the number of visits hit 3 visits. This distribution indicates that the individual has a very low expected rate of doctor visits. The highly right-skewed distribution is typical in Poisson models for count data, especially when the mean count is close to zero.
 
 ```{r}
 last_person <- dvisits[nrow(dvisits), ]
@@ -213,10 +256,10 @@ kable(prob_dist, digits = 5, caption = "Predicted Probability Distribution for D
 (g) Tabulate the frequencies of the number of doctor visits. Compute the expected frequencies of doctor visits under your most recent model. Compare the observed with the expected frequencies and comment on whether it is worth fitting a zero-inflated count model.
 
 **Solution ** 
-The code below tabulates the observed frequencies of doctor visits (doctorco) and predicts the expected number of visits for each individual in the dataset using the most recent Poisson regression model, obtained through stepwise AIC-based model selection. It then computes the expected frequency distribution across visit counts (from 0 to the maximum observed) by averaging the Poisson probabilities for each count across all individuals. The resulting comparison table shows that the observed and expected frequencies are closely aligned, particularly for 0 and 2 visits. The largest discrepancy occurs at 1 visit, where the model slightly overestimates (928.36 expected vs. 782 observed). Notably, the number of zero visits is very well predicted by the model (4141 observed vs. 4013.53 expected).
+The code below tabulates the observed frequencies of doctor visits (doctorco) and predicts the expected number of visits for each individual in the dataset using the most recent Poisson regression model, obtained through stepwise AIC-based model selection. It then computes the expected frequency distribution across visit counts (from 0 to the maximum observed) by averaging the Poisson probabilities for each count across all individuals. The resulting comparison table shows that the observed and expected frequencies are closely aligned, particularly for 0 and 2 visits. The largest discrepancy occurs at 1 visit, where the model slightly overestimates (928.35 expected vs. 782 observed). Notably, the number of zero visits is very well predicted by the model (4141 observed vs. 4013.60 expected).
 
 Evaluation of the Need for a Zero-Inflated Poisson (ZIP) Model:
-Zero-inflated models are typically applied when the observed number of zeros exceeds the expected count under a standard Poisson model. That is not the case here—the predicted number of zero visits (4013.53) is very close to the observed number (4141), indicating that the Poisson model handles zero inflation adequately. Additionally, the remaining distribution (1, 2, 3 visits) aligns well with model predictions. Given this strong agreement, there is no compelling evidence of excess zeros. Therefore, a standard Poisson model is sufficient, and it is not necessary to fit a zero-inflated count model in this case.
+Zero-inflated models are typically applied when the observed number of zeros exceeds the expected count under a standard Poisson model. That is not the case here—the predicted number of zero visits (4013.60) is very close to the observed number (4141), indicating that the Poisson model handles zero inflation adequately. Additionally, the remaining distribution (1, 2, 3 visits) aligns well with model predictions. Given this strong agreement, there is no compelling evidence of excess zeros. Therefore, a standard Poisson model is sufficient, and it is not necessary to fit a zero-inflated count model in this case.
 
 
 ```{r}
@@ -246,26 +289,59 @@ We observe that the Poisson model produces a wider and more dispersed range of f
 
 The Poisson model more effectively captures the long tail of higher doctor visit counts, whereas the Gaussian model struggles—frequently predicting much lower fitted values for individuals with high observed visits due to its inability to accommodate skewed distributions. Therefore, we conclude that the Poisson model provides a better and more practical fit for this dataset, as it respects the count nature of the response variable and handles skew more appropriately.
 
+Residuals Plot: We plot the number of doctor visits against the residuals from both the Poisson and Gaussian (normal) models. In the Poisson residuals plot, we observe a pattern of curved horizontal bands, which is expected when working with count data and discrete residuals. Although the residuals appear structured, they are reasonably centered around zero, and their variance increases slightly with the fitted values—behavior that aligns with Poisson assumptions. In contrast, the Gaussian model residual plot reveals a more problematic pattern. The residuals are more dispersed and exhibit heteroscedasticity (the variance changes with the fitted values), which violates a key assumption of linear regression. Additionally, the fitted values from the Gaussian model are tightly compressed and limited in range, reducing the model’s flexibility in capturing variation in doctor visits.
+
 ```{r}
-model_gaussian <- lm(doctorco ~ sex + age + income + levyplus + freepoor +
-                     illness + actdays + hscore + chronic_combo,
-                     data = dvisits)
+model_pois <- glm(doctorco ~ sex + age + I(age^2) + income + levyplus + 
+                 freepoor + freerepa + illness + actdays + hscore + chronic_combo,
+                 family = poisson, data = dvisits)
 
-fitted_pois <- predict(model_step, type = "response")
-fitted_gaus <- predict(model_gaussian)
-
-plot_data <- data.frame(
-  Observed = dvisits$doctorco,
-  Poisson_Fitted = fitted_pois,
-  Gaussian_Fitted = fitted_gaus
-)
-
-ggplot(plot_data, aes(x = Observed)) +
-  geom_point(aes(y = Poisson_Fitted, color = "Poisson")) +
-  geom_point(aes(y = Gaussian_Fitted, color = "Gaussian"), alpha = 0.5) +
-  labs(title = "Observed vs. Fitted Values: Poisson vs. Gaussian",
-       y = "Fitted Values", x = "Observed Doctor Visits") +
-  scale_color_manual(name = "Model", values = c("Poisson" = "blue", "Gaussian" = "red")) +
-  theme_minimal()
+dvisits$sqrt_visits <- sqrt(dvisits$doctorco + 0.5)  
+model_gauss <- lm(sqrt_visits ~ sex + age + I(age^2) + income + levyplus + 
+                freepoor + freerepa + illness + actdays + hscore + chronic_combo,
+                data = dvisits)
 ```
+
+
+```{r}
+dvisits <- dvisits %>%
+  mutate(
+    pois_pred = predict(model_pois, type = "response"),
+    pois_resid = residuals(model_pois, type = "deviance"),
+  
+    gauss_pred = (predict(model_gauss))^2 - 0.5, 
+    gauss_resid = residuals(model_gauss)
+  )
+
+p1 <- ggplot(dvisits, aes(x = doctorco)) +
+  geom_point(aes(y = pois_pred, color = "Poisson"), alpha = 0.3) +
+  geom_point(aes(y = gauss_pred, color = "Gaussian"), alpha = 0.3) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  labs(title = "Observed vs. Predicted Values",
+       x = "Observed Visits", y = "Predicted Visits") +
+  scale_color_manual(values = c("Poisson" = "red", "Gaussian" = "blue")) +
+  theme_minimal()
+
+p2 <- ggplot(dvisits, aes(x = pois_pred, y = pois_resid)) +
+  geom_point(alpha = 0.3, color = "red") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(title = "Poisson: Residuals vs. Fitted",
+       x = "Predicted Visits", y = "Deviance Residuals") +
+  theme_minimal()
+
+p3 <- ggplot(dvisits, aes(x = gauss_pred, y = gauss_resid)) +
+  geom_point(alpha = 0.3, color = "blue") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(title = "Gaussian: Residuals vs. Fitted",
+       x = "Predicted Visits", y = "Residuals") +
+  theme_minimal()
+
+(p1 | (p2 / p3)) + plot_layout(widths = c(1, 1))
+```
+
+
+
+
+
+
 
