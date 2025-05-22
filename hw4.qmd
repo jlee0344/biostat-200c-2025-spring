@@ -1,0 +1,87 @@
+---
+title: "Biostat 200C Homework 4"
+subtitle: Due May 23  @ 11:59PM
+date: today
+format:
+  html:
+    theme: cosmo
+    embed-resources: true
+    number-sections: true
+    toc: true
+    toc-depth: 4
+    toc-location: left
+    code-fold: false
+engine: knitr
+knitr:
+  opts_chunk: 
+    fig.align: 'center'
+    # fig.width: 6
+    # fig.height: 4
+    message: FALSE
+    cache: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = FALSE)
+```
+
+```{r}
+library(faraway) 
+library(MASS) 
+```
+
+## Q1. ELMR Excercise 7.5 (p150) 
+
+The debt data arise from a large postal survey on the psychology of debt. The frequency of credit card use is a three-level factor ranging from never, through occasionally to regularly.
+
+```{r}
+data(debt)
+View(debt) 
+```
+
+
+(a) Declare the response as an ordered factor and make a plot showing the relationship to prodebt. Comment on the plot. Use a table or plot to display the relationship between the response and the income group.
+
+(b) Fit a proportional odds model for credit card use with all the other variables as predictors. What are the two most significant predictors (largest t-values) and what is their qualitative effect on the response? What is the least significant predictor?
+
+(c) Fit a proportional odds model using only the least significant predictor from the previous model. What is the significance of this predictor in this small model? Are the conclusions regarding this predictor contradictory for the two models?
+
+(d) Use stepwise AIC to select a smaller model than the full set of predictors. You will need to handle the missing values carefully. Report on the qualitative effect of the predictors in your chosen model. Can we conclude that the predictors that were dropped from the model have no relation to the response?
+
+(e) Compute the median values of the predictors in your selected model. At these median values, contrast the predicted outcome probabilities for both smokers and nonsmokers.
+
+(f) Fit a proportional hazards model to the same set of predictors and recompute the two sets of probabilities from the previous question. Does it make a difference to use this type of model?
+
+
+
+## Q2. Moments of exponential family distributions
+
+**Solution** 
+Solution is on another page. 
+
+
+## Q3. Score and information matrix of GLM
+
+**Solution ** 
+Solution is on another page. 
+
+## Q4. ELMR Exercise 8.1 (p171)
+
+
+## Q5. ELMR Exercise 8.4 (p172)
+
+
+## Q6. ELMR Exercise 8.5 (p172)
+
+
+
+
+
+
+
+
+
+
+
+
+
