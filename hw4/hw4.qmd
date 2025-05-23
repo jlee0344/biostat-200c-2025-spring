@@ -425,6 +425,10 @@ Again using the Galápagos data, fit a Poisson model to the species response wit
 
 (a) Use the z-statistic from the model summary.
 
+**Solution ** 
+
+We test the significance of the elevation predictor in the Poisson regression model using the z-statistic from the model summary. The result yields a z-value of around 40.51 and a corresponding p-value equal to 0. The large z-value indicates that the estimated coefficient for elevation is far from 0 in terms of standard errors, and the p-value confirms that such a result would be almost impossible under the null hypothesis that elevation has no effect on species count. Therefore, we reject the null hypothesis with large confidnece. This provides strong statistical evidence that elevation is a significant predictor in explaining the variation in species richness across the Galapagos islands. 
+
 ```{r}
 model <- glm(Species ~ Area + Elevation + Nearest + Scruz + Adjacent, 
              family = poisson, 
@@ -442,30 +446,72 @@ cat("p-value:", elevation_p, "\n")
 
 (b) Fit a model without elevation and use the difference in deviances to make the test.
 
+**Solution ** 
+We tested the significance of the elevation predictor in the Poisson regression model using a likelihood ratio test, which compares two nested models: a full model that includes the elevation predictor and a reduced model that excludes it. The deviance of the full model was 716.8458, while that of the reduced model was 2389.569. The resulting deviance difference of 1672.723 serves as the test statistic, which follows a chi-squared distribution with 1 degree of freedom, corresponding to the single predictor being tested. The associated p-value was effectively zero, indicating that the inclusion of elevation significantly improves the model fit. Consequently, we reject the null hypothesis that the elevation coefficient is zero, confirming that elevation is a statistically significant predictor of species count in the Galápagos data. This result is consistent with the conclusion drawn in the previous part using the z-test.
+
 ```{r}
-model_no_elevation <- glm(Species ~ Area + Nearest + Scruz + Adjacent, 
-             family = poisson, 
-             data = gala)
+# Full model with Elevation
+full_model <- glm(Species ~ Area + Elevation + Nearest + Scruz + Adjacent,
+                  family = poisson(link = "log"), data = gala)
 
-model_summary <- summary(model_no_elevation)
+reduced_model <- glm(Species ~ Area + Nearest + Scruz + Adjacent,
+                     family = poisson(link = "log"), data = gala)
+full_dev <- deviance(full_model)
+reduced_dev <- deviance(reduced_model)
+dev_diff <- reduced_dev - full_dev
+
+df_diff <- df.residual(reduced_model) - df.residual(full_model)
+
+p_value <- pchisq(dev_diff, df = df_diff, lower.tail = FALSE)
+cat("Deviance (full model):", full_dev, "\n")
+cat("Deviance (reduced model):", reduced_dev, "\n")
+cat("Deviance difference:", dev_diff, "\n")
+cat("Degrees of freedom difference:", df_diff, "\n")
+cat("p-value (likelihood ratio test):", p_value, "\n")
 ```
-
 
 (c) Use the Pearson Chi-squared statistic in place of the deviance in the previous test.
 
+**Solution ** 
+Instead of using the difference in deviance as the test statistic, we use the Pearson Chi-squared statistic and proceed with a likelihood ratio-style comparison. The Pearson statistic measures the discrepancy between the observed and expected counts under the model. We compare a full model (which includes the elevation predictor) with a reduced model (which excludes it). The Pearson Chi-squared statistic for the full model is 761.9792, while for the reduced model it is 2910.536. The difference between these values, 2148.557, serves as the test statistic and follows a chi-squared distribution with 1 degree of freedom. The resulting p-value is effectively zero, indicating that the exclusion of elevation results in a significantly poorer model fit. Therefore, we reject the null hypothesis that the elevation coefficient is zero and conclude that elevation is a statistically significant predictor of species count in the Galápagos data. This finding is consistent with the conclusions drawn from the previous tests.
+
 ```{r}
+pearson_full <- sum(residuals(full_model, type = "pearson")^2)
+pearson_reduced <- sum(residuals(reduced_model, type = "pearson")^2)
+
+# Difference as test statistic
+pearson_diff <- pearson_reduced - pearson_full
+
+# Degrees of freedom difference
+df_diff <- df.residual(reduced_model) - df.residual(full_model)
+
+# p-value from chi-squared distribution
+p_value_pearson <- pchisq(pearson_diff, df = df_diff, lower.tail = FALSE)
+
+# Output
+cat("Pearson Chi-squared (full model):", pearson_full, "\n")
+cat("Pearson Chi-squared (reduced model):", pearson_reduced, "\n")
+cat("Chi-squared difference:", pearson_diff, "\n")
+cat("Degrees of freedom difference:", df_diff, "\n")
+cat("p-value (Pearson Chi-squared test):", p_value_pearson, "\n")
 
 ```
 
-
 (d) Fit the Poisson model with a free dispersion parameter as described in Section 5.2. Make the test using the model summary.
 
-```{r}
+**Solution ** 
 
+```{r}
+quasi_model <- glm(Species ~ Area + Elevation + Nearest + Scruz + Adjacent,
+                   family = quasipoisson(link = "log"), data = gala)
+
+summary(quasi_model)
 ```
 
 
 (e) Use the sandwich estimation method for the standard errors in the original model. Use these to compute z-statistics.
+
+**Solution ** 
 
 ```{r}
 
@@ -473,13 +519,14 @@ model_summary <- summary(model_no_elevation)
 
 (f) Use the robust GLM estimation method and report the test result from the summary.
 
+**Solution ** 
 ```{r}
 
 ```
 
 (g) Compare all six results. Pick the best one and justify your choice.
 
-
+**Solution ** 
 ```{r}
 
 ```
