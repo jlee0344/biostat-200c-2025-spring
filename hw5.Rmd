@@ -24,6 +24,11 @@ knitr:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, cache = FALSE)
 ```
+
+```{r}
+library(faraway)
+```
+
 ## Q1. Balanced one-way ANOVA random effects model
 
 Consider the balanced one-way ANOVA random effects model with $a$ levels and $n$ observations in each level
@@ -79,17 +84,41 @@ The ratdrink data consist of five weekly measurements of body weight for 27 rats
 
 (a) Plot the data showing how weight increases with age on a single panel, taking care to distinguish the three treatment groups. Now create a three-panel plot, one for each group. Discuss what can be seen.
 
+```{r}
+data(ratdrink)
+View(ratdrink)
+```
+
+
 (b) Fit a linear longitudinal model that allows for a random slope and intercept for each rat. Each group should have a different mean line. Give interpretation for the following estimates:
 
 i. The fixed effect intercept term.
 ii. The interaction between thiouracil and week.
 iii. The intercept random effect SD.
 
+```{r}
+
+```
+
 (c) Check whether there is a significant treatment effect.
+
+```{r}
+
+```
+
 
 (d) Construct diagnostic plots showing the residuals against the fitted values and a QQ plot of the residuals. Interpret.
 
+```{r}
+
+```
+
 (e) Construct confidence intervals for the parameters of the model. Which random effect terms may not be significant? Is the thyroxine group significantly different from the control group?
+
+```{r}
+
+```
+
 
 
 
