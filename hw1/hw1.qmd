@@ -46,6 +46,7 @@ library(lmtest)
 ```
 
 
+
 To submit homework, please submit Rmd and html files to bruinlearn by the deadline.
 
 ## Q1. Reivew of linear models (60pts)
