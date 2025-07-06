@@ -732,3 +732,5 @@ summary(model_with_dbp)
 ```
 
 The first question examines a univariate association (diastolic blood pressure versus the test outcome while not taking account for the other predictors in the model) while the second question examines a multivariate association (the diastolic blood pressure's contribution after accounting for other predictors). Although the t-test shows that the diastolic blood pressure differs between the groups in isolation, the regression model shows that the diastolic blood pressure predictor variables does not provide additional predictive power beyond the other variables in the model. Therefore, the answers seem contradictory because in the t-test we were able to see that the diastolic blodo pressure alone is associated with the test outcome. In the regression, diastolic blood pressure may be correlated with other predictors, therefore making it insiginificant. In addition, even though the mean difference between the diastolic blood pressures between the two testing groups may be statistically significant, it doesn't improve the prediction meaningfully in a multivariate model.
+
+**END** 
