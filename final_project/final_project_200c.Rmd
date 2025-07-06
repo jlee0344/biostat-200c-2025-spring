@@ -1,0 +1,654 @@
+---
+title: "Biostat 200C Final"
+subtitle: Due Fri. June 13, 2025 @ 11:59PM
+date: today
+format:
+  html:
+    theme: cosmo
+    embed-resources: true
+    number-sections: true
+    toc: true
+    toc-depth: 4
+    toc-location: left
+    code-fold: false
+engine: knitr
+knitr:
+  opts_chunk: 
+    fig.align: 'center'
+    # fig.width: 6
+    # fig.height: 4
+    message: FALSE
+    cache: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = FALSE)
+library(tidyverse)
+library(faraway)
+library(survival)
+library(ggfortify)
+library(MASS)
+library(lme4)
+library(geepack)
+library(ggplot2)
+library(mgcv)
+library(lme4)
+library(lmerTest)
+library(broom.mixed)
+library(knitr)
+library(gamm4)
+library(readr)
+library(gratia)
+library(broom)
+library(pbkrtest)
+```
+
+This is a take-home and an open book final. Helping or asking help from others is considered plagiarism. 
+
+
+
+## Q1 (25 pts). Longitudinal data analysis 
+
+Onychomycosis, popularly known as toenail fungus, is a fairly common condition that not only can disfigure and sometimes destroy the nail but that also can lead to social and self-image issues for sufferers. Tight-fitting shoes or hosiery, the sharing of common facilities such as showers and locker rooms, and toenail polish are all thought to be implicated in the development of onychomycosis. This question relates to data from a study conducted by researchers that recruited sufferers of a particular type of onychomycosis, dermatophyte onychomycosis. The study conducted by the researchers was focused on comparison of two oral medications, terbinafine (given as 250 mg/day, denoted as treatment 1 below) and itraconazole (given as 200 mg/day, denoted as treatment 2 below). 
+
+The trial was conducted as follows. 200 sufferers of advanced toenail dermatophyte onychomycosis in the big toe were recruited, and each saw a physician, who removed the afflicted nail. Each subject was then randomly assigned to treatment with either terbinafine (treatment 1) or itraconazole (treatment 2). Immediately prior to beginning treatment, the length of the unafflicted part of the toenail (which was hence not removed) was recorded (in millimeters). Then at 1 month, 2 months, 3 months, 6 months, and 12 months, each subject returned, and the length of the unafflicted part of the nail was measured again. A longer unafflicted nail length is a better outcome. Also recorded on each subject was gender and an indicator of the frequency with which the subject visited a gym or health club (and hence might use shared locker rooms and/or showers).
+
+The data are available in the file `toenail.txt` from [here](https://github.com/ucla-biostat-200c/2025spring/tree/master/hw/datasets). The data are presented in the form of one data record per observation; the columns of the data set are as follows:
+
+1. Subject id
+2. Health club frequency indicator (= 0 if once a week or less, = 1 if more than once a week)
+3. Gender indicator (= 0 if female, = 1 if male)
+4. Month
+5. Unafflicted nail length (the response, mm)
+6. Treatment indicator (= 1 if terbinafine, = 2 if itraconazole)
+
+The researchers had several questions, which they stated to you as follows:
+
+Use the linear mixed effect model (LMM) to answer: Is there a difference in the pattern of change of lengths of the unafflicted part of the nail between subjects receiving terbinafine and itraconazole over a 12 month period? Does one treatment show results more quickly?  
+    
+1. Plot the change of lengths of the unafflicted part of the nail over time and separated by treatment groups. Comment on overall patterns over time.
+
+```{r}
+
+```
+
+2. Based on the pattern observed, pick appropriate time trend in the LMM and provide an algebraic definition for your chosen LMM, e.g., is the linear trend model adequate? or quadratic trend is needed? or any other pattern is more approriate? justify your answer. 
+    
+```{r}
+
+```
+
+3. Model the covariance: fit both random intercept and random slope model and determine which one fits the data better. 
+
+```{r}
+
+```
+
+
+
+In answering these scientific questions of interest, clearly write out the analytic models you consider for answering these questions (as detailed in the sub-questions). Clearly outline your decision making process for how you selected your final models. Fit your chosen final models and report to the project investigators on the stated scientific questions of interest.
+
+
+
+## Q2 (25 pts). GEE and GLMM
+
+The Skin Cancer Prevention Study, a randomized, double-blind, placebo-controlled clinical trial, was designed to test the effectiveness of beta-carotene in the prevention of non-melanoma skin cancer in high-risk subjects. A total of 1,683 subjects were randomized to either placebo or 50mg of beta-carotene per day and were followed for up to 5 years. Subjects were examined once per year and biopsied if a cancer was suspected to determine the number of new cancers per year. The outcome variable, $Y$, is a count of the number of new skin cancers per year. You may assume that the counts of new skin cancers, $Y$, are from exact one-year periods (so that no offset term is needed).
+
+Selected data from the study are in the dataset called `skin.txt` and is available [here](https://github.com/ucla-biostat-200c/2025spring/tree/master/hw/datasets). Each row of the dataset contains the following 9 variables: ID, Center, Age, Skin, Gender, Exposure, $Y$, Treatment, Year. These variables take values as follows:
+
+| Variable |  |
+| ----------------- | ------------------------- |
+|**ID**:            | Subject identifier number |
+|**Center**:        | Identifier number for center of enrollment|
+|**Age:**         | Subject’s age in years at randomization|
+|**Skin:**        |Skin type (1=burns; 0 otherwise) [evaluated at randomization and doesn’t change with time]|
+|**Gender:**      |1=male; 0=female| 
+|**Exposure:**    |Count of number of previous skin cancers [prior to randomization]|
+|**$Y$:**           |Count of number of new skin cancers in the Year of follow-up|
+|**Treatment:**   |1=beta-carotene; 0=placebo|
+|**Year:**        |Year of follow-up after starting randomized treatment| (ranges from 1-5) 
+
+
+Your collaborator is interested in assessing the effect of treatment on the incidence of new  skin cancers over time. As the statistician on the project, provide an analysis of the data that addresses this question. Specifically, the investigator at Center=1 is interested in characterizing the distribution of risk among subjects at her center. In the following, only include the subset of subjects with Center=1 in the analysis.
+
+Reorganizing and printing out the first few rows of the dataset (skin_data): 
+
+```{r}
+skin_data <- read.table("~/Downloads/skin.txt", header = FALSE)
+colnames(skin_data) <- c("ID", "Center", "Age", "Skin", "Gender", 
+                         "Exposure", "Y", "Treatment", "Year")
+head(skin_data)
+```
+
+Reorganizing and printing out the first few rows of the dataset (new_skin) which filters out the rows with Center = 1. 
+
+```{r}
+new_skin<- skin_data %>% filter(Center == 1)
+str(new_skin)
+summary(new_skin)
+head(new_skin)
+```
+
+1. Provide an algebraic definition for a generalized linear marginal model (GEE) in which the only effects are for the intercept and Year (as a continuous variable). Fit this model and provide a table which includes the estimates of the parameters in your model.
+
+**Solution ** 
+
+**Algebraic Definition for the Generalized Linear Marginal Model (GEE): **
+
+The fitted Generalized Estimating Equations (GEE) model estimates the log of the population-average expected rate of new skin cancers per one-year follow-up period, where effects represent average changes across all individuals in the population, rather than subject-specific tragectories. This is a Poisson log-linear marginal model with an exchangeable working correlation structure to account for repeated measurements within subjects.
+
+Algebraic form of model: $\log(\mathbb{E}(Y_{ij})) = \beta_0 + \beta_1 \cdot \text{Year}_{ij}$
+
+In our specific model: $\log(\mathbb{E}(Y_{ij})) = -1.5410 - 0.1065 \cdot \text{Year}_{ij}$
+
+Where:
+1) $Y_{ij}$ is the count of new skin cancers for subject $i$ in year $j$ (where $j = 1, 2, \dots, 5$).  
+2) $\beta_0$: $\log$ expected count of new skin cancers at year 0.  
+3) $\beta_1$: Rate of change in log-expected new skin cancer counts per additional year of follow-up.  
+4) $\mathbb{E}(Y_{ij})$: Expected count of new skin cancers for subject $i$ in year $j$.
+
+Distribution and Link Function:  
+1) Random component: $Y_{ij} \sim \text{Poisson}(\mu_{ij})$. In other words, counts are Poisson-distributed with mean $\mu_{ij}$.  
+2) Link function: $\log(\mu_{ij})$
+
+Handling dependence (repeated measures): In GEE, repeated measurements of the same subject over time are not independent. The exchanageable assumption is that all pairs of measurements within a subject have equal correlation, no matter how far apart they are in time: $\text{Corr}(Y_{ij}, Y_{ik}) = \alpha$ for $j \ne k$. In our model, the estimate for $\alpha$ is 0.232. This assumption is reasonable if correlations between years are similar (such as equally spaced visits).
+
+```{r}
+gee_fit <- geeglm(Y ~ Year, 
+                   id = ID, 
+                   data = new_skin, 
+                   family = poisson(link = "log"),
+                   corstr = "exchangeable")
+
+summary(gee_fit)
+```
+
+**Table that includes the estimates of the parameters in the Generalized Linear Marginal Model (GEE):** 
+The estimate value of the intercept is -1.541 with a standard error of 0.1674	and a p-value of <0.01. The estimate value of the year coefficient is -0.107 with a standard error of 0.0486 and a p-value of 0.0284. 
+
+```{r}
+gee_results <- tidy(gee_fit)
+print(gee_results)
+```
+
+2. Provide an algebraic definition for a generalized linear mixed model (GLMM) in which the only fixed effects are for the intercept and Year (as a continuous variable), and the only random effect is the intercept. What is being assumed about how the distribution of risk among subjects changes with time?
+     
+**Solution ** 
+
+**Algebraic Definition for the Generalized Linear Mixed Model: ** 
+
+The Generalized Linear Mixed Model (GLMM) extends the marginal model by incorporating subject-specific random effects. It models the log of the expected rate of new skin cancers per year, while accounting for both population-level trends and individual-level variability. The GLMM assumes that all subjects share the same rate of change over time (fixed slope B1) but allows their baseline risk levels to differ through individual random intercepts bi. This GLMM differs from a GEE model in that it provides subject-specific (conditional) estimates, models individual risk trajectories through random intercept, and assumes that the ranking of subjects by risk remains constant over time (random intercepts are time-invariant).
+
+Algebraic form of model: $\log(\mathbb{E}(Y_{ij} \mid b_i)) = \beta_0 + b_i + \beta_1 \cdot \text{Year}_{ij}$
+
+Where:  
+$Y_{ij}$ = count of new skin cancers for subject $i$ in year $j$  
+$\beta_0$ = fixed intercept (population-average log expected count at year = 0)  
+$b_i$ = random intercept for subject $i$, assumed $b_i \sim \mathcal{N}(0, \sigma_b^2)$; subject-specific random intercept that captures baseline heterogeneity  
+$\beta_1$ = fixed slope for year (change in log expected count per year)
+
+Distribution and link function:  
+Conditional distribution: $Y_{ij} \mid b_i \sim \text{Poisson}(\mu_{ij})$, where $\mu_{ij} = \mathbb{E}(Y_{ij} \mid b_i)$  
+Link function: $\log(\mu_{ij}) = \beta_0 + b_i + \beta_1 \cdot \text{Year}_{ij}$
+
+**Generalized Linear Mixed Model Assumptions: **
+The GLMM model with random intercepts makes specific assumptions about how the risk of new skin cancers evolves over time across subjects:
+
+1. Variability in Baseline Risk (Random Intercepts): 
+The generalized linear mixed model assumes that each subject i has their own baseline risk level at Year = 0, which is modeled by a random intercept bi. Mathemtically, these random effects are assumed to follow a normal distribution: $b_i \sim \mathcal{N}(0, \sigma_b^2)$. This reflects the idea that individuals differ in their initial level of risk, and the variance quantifies how much the baseline risk varies across the subjects. 
+
+2. Time Trend (Fixed Effect of Year): The effect of time (i.e., Year) is modeled as a fixed effect B1, which means that all individuals are assumed to experience the same rate of change in the log of expected counts per year of follow up. The model assumes parallel trends: high-risk and low-risk subjects both follow the same slope across years. This assumption may not hold in real-world data. For example, if a treatment works more effectively for some individuals than others, subjects’ risks may decline at different rates. In these cases, the model may fail to capture this heterogeneity. 
+
+3. Constant Variance of Risk Over Time: The model assumes that the variance in risk across subjects remains constant over time: For instance, 
+
+At Year $= 0$: The risk (on the log scale) for subject $i$ is $\log(\lambda_{i0}) = \beta_0 + b_i$, where $b_i \sim \mathcal{N}(0, \sigma_b^2)$. The variance of log-risk across subjects is $\sigma_b^2$.
+
+At Year $= t$: The log-risk becomes $\log(\lambda_{it}) = \beta_0 + b_i + \beta_1 t$. The variance of log-risk is still $\sigma_b^2$ (because $\beta_1 t$ is a fixed shift for everyone).
+
+However, the constant variance of risk over time assumption may be unrealistic in settings where inter-subject variability shrinks or grows over time. For instance, if high risk individuals benefit more from treatment (beta-carotene), the variability in risk might decrease with follow-up—violating the assumption of constant variance.
+
+Overall, the model assumes that the distribution of risk across subjects is stable over time: each individual has a unique baseline log-risk (via the random intercept), but all individuals are assumed to experience the same rate of change in the risk of developing new skin cancers over time (fixed slope). 
+
+
+3. Fit your chosen GLMM and provide a table from your output which includes the estimates for the parameters in your GLMM, and provide careful interpretation of the Year term.
+
+**Solution ** 
+
+A Poisson generalized linear mixed model (GLMM) included fixed effects for the intercept (representing the log expected rate of new skin cancers per year at Year = 0 for a subject with average baseline risk (random effect bi = 0)) and Year (capturing the change in log expected rat eper additional year of follow up. A random intercept for each subject (ID) was included, assuming a normal distribution, to account for individual differences in baseline log rates. 
+
+Interpretation of the Year term: Holding all other predictors constant and after accounting for between-subject variability in baseline risk (via random intercepts), the model estimates that subjects experience a statistically significant decline in the expected annual rate of new skin cancers over time. Specifically, the expected annual rate of new skin cancer counts decreases by approximately 10.3% for each additional year of follow up after treatment initiation (placebo or treatment). This is based on the exponentiated coefficient for Year: (exp(-0.1083) = 0.897). 
+
+```{r}
+glmm_model <- glmer(Y ~ Year + (1 | ID), 
+                    data = new_skin, 
+                    family = poisson(link = "log"))
+summary(glmm_model)
+```
+
+**Table that includes the estimates of the parameters (fixed effect estimates) in the Generalized Linear Mixed Model (GLMM): ** 
+
+```{r}
+glmm_table <- tidy(glmm_model, effects = "fixed")
+print(glmm_table)
+```
+
+4. Are the estimates for the fixed intercept terms the same or different in the GLMM compared with the marginal model fitted in question (1)? Why are they the same or different?
+
+**Solution ** 
+
+The estimates for the fixed intercept terms are different between the GLMM and the marginal model (GEE) from Question (1). In the GLMM, the fixed intercept is –2.299, whereas in the GEE, it is –1.541.
+
+This difference in the fixed intercept terms occur because the two models address different inferential questions.
+The GLMM provides subject-specific (conditional) estimates. The fixed intercept represents the log expected count of new skin cancers for an individual, conditional on their random effect being zero (for a theoretical "average" subject with bi = 0). So, $\log(\lambda_{ij}) = \beta_0 + b_i + \beta_1 \cdot \text{Year}_{ij},\quad b_i \sim \mathcal{N}(0, \sigma_b^2)$. This intercept reflects the expected value for an individual, not an average over all subjects. The GLMM explicitly models within-subject correlation and captures between-subject variability through random effects.
+
+In contrast, the GEE model provides population-average (marginal) estimates. The fixed intercept represents the log expected count averaged across all individuals in the population: $\log(\mathbb{E}[Y_{ij}]) = \beta_0^*$ GEE accounts for within-subject correlation using a working correlation structure, but it does not model the distribution of individual-level effects like random intercepts.
+
+The two intercepts would only align if there was no between subject variability ($(\sigma_b^2 \approx 0)$) mening that all the subjects share the same baseline risk. 
+
+Table Contrasting the Estimates for the Fixed Effect Estimtes in GEE and GLMM: 
+
+```{r}
+glmm_table <- tidy(glmm_model, effects = "fixed") %>%
+  mutate(Model = "GLMM")
+
+gee_table <- tidy(gee_fit) %>%
+  mutate(Model = "GEE")
+
+comparison_table <- bind_rows(glmm_table, gee_table) %>%
+  dplyr::select(Model, term, estimate, std.error, statistic, p.value) %>%
+  mutate(across(c(estimate, std.error, statistic), ~ round(., 4)),
+         p.value = ifelse(p.value < 0.001, "<0.001", round(p.value, 3)))
+
+knitr::kable(comparison_table, caption = "Comparison of Fixed Effect Estimates: GLMM vs. GEE")
+
+```
+
+
+5. Use the parameter estimates from your GLMM and your model definition to characterize the distribution of expected counts of new skin cancers among subjects at center 1 during their first year of follow-up.
+
+**Solution ** 
+The distribution of expected counts of new skin cancers among subejcts at center 1 during their first year of follow up is 
+
+```{r}
+
+```
+
+
+## Q3. (25 pts) LMM and GAMM
+
+This question is adapted from Exercise 11.2 of ELMR (p251). Read the documentation of the dataset `hprice` in Faraway package before working on this problem.
+
+```{r}
+data(hprice)
+str(hprice) 
+View(hprice)
+```
+
+
+1. Make a plot of the data on a single panel to show how housing prices increase by year. Describe what can be seen in the plot.
+
+**Solution ** 
+
+The first plot illustrates how housing prices, represented by the natural log of the average sale price (in thousands of dollars), change over time from 1986 to 1994 for different Metropolitan Statistical Areas (MSAs). Each colored line corresponds to a different MSA. The log-transformed housing prices range from just below 4 to slightly above 5.5, which translates to a raw price range of approximately 55,000 dollars to 245,000 dollars, revealing the significant regional variation in housing prices. From the plot, we observe that most MSAs experience an overall increase in housing prices across this nine-year period. Notably, some MSAs that began with higher housing prices in 1986 exhibit more rapid growth during the early years (1986–1990) and continue to rise at elevated levels. In contrast, other MSAs, which start at lower housing price levels, show slower and flatter trends in later years, highlighting the variation in price trajectories across different regions. Interestingly, the MSAs with initially lower housing prices demonstrate more consistent and steady growth without significant peaks or plateaus. Overall, the vertical spread between the highest-priced and lowest-priced MSAs widens over time, underscoring the growing regional disparities in housing prices between expensive and more affordable MSAs during this period.
+
+```{r}
+ggplot(hprice, aes(x = time, y = narsp, group = msa, color = msa)) +
+  geom_line(alpha = 0.6) +
+  geom_point(size = 1, alpha = 0.6) +
+  scale_x_continuous(breaks = 1:9, labels = 1986:1994) +
+  labs(title = "Housing Prices Over Time by MSA",
+       x = "Year",
+       y = "Natural Log of Average Sale Price (in thousands)",
+       color = "MSA") +
+  theme_minimal() +
+  theme(legend.position = "none") 
+```
+
+Similarly, the second plot tracks changes in the natural log of average housing sale prices (in thousands of dollars) across Metropolitan Statistical Areas (MSAs) from 1986 to 1994. In this visualization, the gray lines represent the price trajectories of individual MSAs, reflecting the regional variations highlighted in the first plot. A thick red line, fitted using a Generalized Additive Model (GAM), provides a nonparametric smooth estimate of the overall market trend, effectively averaging out MSA-level fluctuations. The GAM-smoothed red line shows a consistent upward trajectory, indicating steady growth in average housing prices across all MSAs during this nine-year period. While the individual MSA lines vary (some showing rapid increases and others more steady growth) the overall market still experienced a consistent and increasing growth. This smoothing approach helps us see the broader trend across the country, highlighting that housing prices increased everywhere, even though the rate of growth differed between regions.
+
+```{r}
+ggplot(hprice, aes(x = time, y = narsp)) +
+  geom_line(aes(group = msa), alpha = 0.2) +
+  geom_smooth(method = "gam", 
+              formula = y ~ s(x, k = 5), 
+              se = FALSE, 
+              color = "red", 
+              size = 1.5) +
+  scale_x_continuous(breaks = 1:9, labels = 1986:1994) +
+  labs(title = "Housing Prices Over Time with Overall Trend",
+       x = "Year",
+       y = "Natural Log of Average Sale Price (in thousands)") +
+  theme_minimal()
+```
+
+2. Fit a linear model with the (log) house price as the response and all other variables (except msa) as fixed effect predictors. Which terms are statistically significant? Discuss the coefficient for time.
+
+**Solution ** 
+
+A linear model was fit with the log of average house price (narsp) as the response variable and all other variables (ypc, perypc, regtest, rcdum, ajwtr, and time) as predictors. The model summary reveals that the statistically significant terms (p-value below 0.05) are ypc, perypc, regtest, rcdum1, and time. In other words, all predictors except ajwtr are statistically significant in explaining the variation in housing prices.
+
+The coefficient for time is -0.0177 has the interpretation: after controlling for average per capita income, percentage growth in per capita income, regulatory environment index, rent control status, and adjacency to a coastline, the natural log of average housing sale prices declined by approximately 0.0177 units each year from 1986 to 1994. On the original price scale (in thousands of dollars), this corresponds to an estimated 1.75% annual decrease (calculated as e^-0.0177 = 0.9824 or a 1.75% decline per year). Thus, even after accounting for key economic and regulatory factors, housing prices trended downward on average during this period.
+
+```{r}
+lm_model <- lm(narsp ~ ypc + perypc + regtest + rcdum + ajwtr + time, 
+               data = hprice)
+summary(lm_model)
+```
+
+3. Make a plot that shows how per-capita income changes over time. What is the nature of the increase? Make a similar plot to show how income growth changes over time. Comment on the plot.
+
+**Solution ** 
+
+The first plot below depicts a clear upward trend in average per capita income from 1986 to 1994, rising from approximately 15,500 dollars in 1986 to around 21,000 dollars in 1994 - a nominal increase of 35.5% over the nine-year period. The growth pattern is somewhat nonlinear. From 1986 to 1990, income increases steeply from 15,500 dollars to 19,200 dollars, indicating a period of accelerated growth. Between 1990 and 1992, the slope flattens, suggesting a temporary slowdown as income rises by only 600 dollars. However, from 1992 to 1994, the slope steepens again, reflecting renewed growth, with income rising from 19,800 dollars to 21,000 dollars. Notably, there are no year-to-year declines throughout this period. This consistent upward trajectory underscores the steady and robust growth in per capita income during these years.
+
+```{r}
+ypc_summary <- hprice %>%
+  group_by(time) %>%
+  summarise(
+    mean_ypc = mean(ypc, na.rm = TRUE),
+  )
+
+ggplot(ypc_summary, aes(x = time, y = mean_ypc)) +
+  geom_line(size = 1, color = "navy") +
+  geom_point(size = 3, shape = 21, fill = "white", color = "navy", stroke = 1.5) +
+  scale_x_continuous(breaks = 1:9, 
+                     labels = 1986:1994,
+                     minor_breaks = NULL) +
+  scale_y_continuous(labels = scales::dollar_format(),
+                     limits = c(NA, max(ypc_summary$mean_ypc) * 1.1)) +
+  labs(
+    title = "Trend in Average Per Capita Income (ypc) from 1986-1994",
+    x = "Year",
+    y = "Per Capita Income (USD)",
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major = element_line(color = "grey90"),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5, color = "grey40"),
+    axis.title = element_text(face = "bold")
+  )
+```
+
+The second plot illustrates the year-over-year percentage growth in per capita income from 1986 to 1994. The growth rates exhibit cyclical fluctuations, varying between approximately 2% and 7%, without any periods of negative growth—indicating that income continued to rise each year, although at different rates. The highest growth rates occurred between 1988 and 1990, peaking around 6–7%. This period is followed by a slowdown in growth of per capital income, with rates dropping to around 3–4% in 1991 and 1992. By 1993–1994, growth picks up again, stabilizing around 5%. Overall, the plot suggests that per capita income growth does not follow a steady linear trend, but rather moves in cycles of acceleration and deceleration. 
+
+```{r}
+perypc_summary <- hprice %>%
+  group_by(time) %>%
+  summarise(
+    mean_perypc = mean(perypc, na.rm = TRUE)
+  )
+
+# Create the plot
+ggplot(perypc_summary, aes(x = time, y = mean_perypc)) +
+  geom_line(size = 1, color = "darkgreen") +
+  geom_point(size = 3, shape = 21, fill = "white", color = "darkgreen", stroke = 1.5) +
+  scale_x_continuous(breaks = 1:9, 
+                     labels = 1986:1994,
+                     minor_breaks = NULL) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1),
+                     limits = c(NA, max(perypc_summary$mean_perypc) * 1.1)) +
+  labs(
+    title = "Trend in Average Per Capita Income Growth Rate (perypc) from 1986-1994",
+    x = "Year",
+    y = "Percentage Growth in Per Capita Income",
+    caption = "Note: Growth rates represent year-over-year percentage changes"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major = element_line(color = "grey90"),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5, color = "grey40"),
+    axis.title = element_text(face = "bold")
+  )
+```
+
+4. Create a new variable that is the per-capita income for the first time period for each MSA. Refit the same linear model but now using the initial income and not the income as it changes over time. Compare the two models.
+
+**Soltuion ** 
+We conducted a model comparison to evaluate whether initial per capita income, represented by a new variable initial_ypc (capturing each MSA’s income in the first year, 1986), could serve as an effective substitute for the original time-varying per capita income (ypc) in explaining log average housing prices (narsp). Both models included the same set of predictors: income growth (perypc), regulatory environment index (regtest), rent control indicator (rcdum1), adjacency to coastline (ajwtr1), and time (time). The only distinction between the two models was whether they used ypc or initial_ypc as the income predictor.
+
+Comparing the performance metrics of the two models, we found that the model using initial_ypc outperformed the original across various metrics. The initial income model achieved a higher R-squared value of 0.766 compared to 0.757 for the original model, indicating that it explains a greater proportion of the variation in housing prices. Its adjusted R-squared was also slightly higher (0.762 vs. 0.753), and it yielded a notably lower AIC value (-251 vs. -239), which suggests a better-fitting and more parsimonious model. These results imply that initial income is not only a valid substitute but may actually be a more stable and informative predictor of average housing prices across MSAs than annually fluctuating income.
+
+Looking at the individual coefficients, both ypc and initial_ypc were highly significant in their respective models, reaffirming the importance of income in determining housing prices but the initial_ypc had a larger coefficient ((0.0000887 vs. 0.0000703) implying baseline income's strong association with the log average housing prices. However, the income growth variable (perypc) was significant only in the original model (p = 0.007) and not in the model with initial income (p = 0.103), indicating that once baseline income is accounted for, income growth provides limited additional explanatory power. The regulation index (regtest) was strongly significant and positively associated with housing prices in both models. Rent control (rcdum1) also showed a consistent, significant, and positive effect. The adjacency to coastline variable (ajwtr1) was marginally significant in the original model (p = 0.073) and reached significance in the initial income model (p = 0.05). Interestingly, while the time variable was significant in both models, its effect changed direction: negative in the original model and positive in the initial income model. This shift likely reflects a reduction in collinearity between time and income when initial_ypc is used in place of ypc.
+
+Overall, these findings suggest that initial per capita income captures long-term economic conditions more effectively than annual fluctuations, making it a more robust and interpretable predictor of housing price levels over time.
+
+```{r}
+hprice <- hprice %>%
+  group_by(msa) %>%
+  mutate(initial_ypc = first(ypc[time == 1])) %>%
+  ungroup()
+
+original_model <- lm(narsp ~ ypc + perypc + regtest + rcdum + ajwtr + time, 
+                     data = hprice)
+summary(original_model)
+```
+
+```{r}
+initial_income_model <- lm(narsp ~ initial_ypc + perypc + regtest + rcdum + ajwtr + time, 
+                          data = hprice)
+
+summary(initial_income_model)
+```
+
+
+```{r}
+model_comparison <- list(
+  "Original Model (Time-Varying Income)" = tidy(original_model),
+  "Initial Income Model" = tidy(initial_income_model)
+) %>%
+  bind_rows(.id = "Model") %>%
+  dplyr::select(Model, term, estimate, std.error, p.value) %>%
+  mutate(
+    across(c(estimate, std.error), ~round(., 5)),
+    p.value = ifelse(p.value < 0.001, "<0.001", round(p.value, 3))
+  )
+
+kable(model_comparison, caption = "Comparison of Models with Time-Varying vs Initial Income")
+```
+
+
+```{r}
+fit_stats <- data.frame(
+  Model = c("Original Model (Time-Varying Income)", "Initial Income Model"),
+  R_squared = c(summary(original_model)$r.squared, summary(initial_income_model)$r.squared),
+  Adj_R_squared = c(summary(original_model)$adj.r.squared, summary(initial_income_model)$adj.r.squared),
+  AIC = c(AIC(original_model), AIC(initial_income_model))
+)
+
+kable(fit_stats, caption = "Model Fit Statistics (R², Adjusted R², AIC)")
+```
+
+
+5. Fit a mixed effects model that has a random intercept for each MSA. Why might this be reasonable? The rest of the model should have the same structure as in the previous question. Make a numerical interpretation of the coefficient of time in your model. Explain the difference between REML and MLE methods.
+
+**Solution ** 
+
+We fit a mixed-effects model using lmer() with REML, incorporating a random intercept for each MSA. This approach is appropriate given that our dataset includes repeated measurements for the same MSAs over a nine-year period (1986–1994), which introduces within-group correlations that violate the independence assumption of standard linear models. As observed in Part 1, plotting the natural log of average sale prices over time revealed that different MSAs exhibit distinct baseline housing price levels. By including a random intercept, we allow each MSA to have its own baseline housing price level while assuming that the effects of the other predictors remain constant across MSAs (i.e., fixed slopes). This modeling structure accounts for intra-class correlation—the natural similarity of observations within the same MSA—which helps prevent the underestimation of standard errors, inflation of Type I error rates, and overly narrow confidence intervals.
+
+The coefficient for time in the model is 0.09517, and its interpretation is as follows:
+After controlling for differences in initial per capita income, income growth, regulatory environment, rent control, coastal adjacency, and MSA-level heterogeneity or random intercepts (unobserved differences between MSAs not explained by the fixed predictors), the natural log of average housing sale prices increased by approximately 0.09517 units per year from 1986 to 1994. Because the dependent variable is on a log scale, this change translates to an estimated 9.60% increase per year in average housing prices. This is calculated as: e^0.0917 = 1.096 or a 9.60 percent increase annually.) 
+
+```{r}
+hprice <- hprice %>%
+  mutate(across(c(initial_ypc, perypc, regtest, time), ~ as.numeric(scale(.x))))
+
+lmm_model <- lmer(narsp ~ initial_ypc + perypc + regtest + rcdum + ajwtr + time + 
+                    (1 | msa), 
+                  data = hprice, REML = TRUE)
+summary(lmm_model)
+```
+
+REML versus MLE: 
+The key difference between REML and MLE lies in how they estimate the variance components of a mixed-effects model. REML estimates variance components after accounting for the fixed effects, adjusting for the degrees of freedom lost in estimating those fixed effects. This adjustment makes REML better suited for inference about random effects, as it produces less biased estimates of variance components. However, a limitation of REML is that it cannot be used to compare models with different fixed-effects structures. 
+
+In our REML-fitted model, the variance of the random intercept for MSA was estimated at 0.02361, and the residual variance was 0.00545. These values reflect the variability across MSAs and within observations, respectively, after adjusting for fixed effects. In contrast, when the model was fit using MLE (by setting REML = FALSE), the variance of the MSA random intercept decreased to 0.02025, and the residual variance slightly decreased to 0.00541. This highlights an issue with MLE where it tends to underestimate variance components, particularly for random effects, because it does not adjust for the loss of degrees of freedom from estimating fixed effects. Instead, MLE estimates all model parameters (fixed and random effects) simultaneously, making it more appropriate for model comparison purposes, such as using AIC or likelihood ratio tests. Therefore, in this example, we can conclude that REML is the preferred method for estimating and interpreting model effects, as it provides less biased estimates of the random MSA intercepts. This is important given the relatively small number of clusters (36 MSAs), where REML’s adjustment for the loss of degrees of freedom is important in producing more reliable variance estimates.
+
+Despite the differences in variance estimates, the fixed-effect estimates remained remarkably stable across both methods. For example, the coefficients for time and initial_ypc were nearly identical between the REML and MLE models. Other coefficients showed slight variation, but the overall structure and interpretation of the fixed effects were consistent. 
+
+```{r}
+lmm_model_mle <- lmer(narsp ~ initial_ypc + perypc + regtest + rcdum + ajwtr + time + 
+                        (1 | msa), 
+                      data = hprice, REML = FALSE)
+summary(lmm_model_mle)
+```
+
+6. Fit a model that omits the adjacent to water and rent control predictors. Test whether this reduction in the model can be supported.
+
+**Solution ** 
+The reduced model below omits the predictors for adjacency to water and rent control. Compared to the original full model, it still models the natural logarithm of average house sale prices, while retaining the same random intercept for MSAs to account for baseline differences across regions. It also includes the same set of continuous predictors: initial_ypc (baseline per capita income), perypc (income growth rate), regtest (regulatory environment index), and time.
+
+```{r}
+full_model <- lmer(narsp ~ initial_ypc + perypc + regtest + rcdum + ajwtr + time + 
+                  (1 | msa),
+                  data = hprice, 
+                  REML = TRUE)
+summary(full_model)
+```
+
+```{r}
+reduced_model <- lmer(narsp ~ initial_ypc + perypc + regtest + time +
+                     (1 | msa),
+                     data = hprice,
+                     REML = TRUE)
+summary(reduced_model)
+```
+
+Comparison between the Full and Reduced Model Observations: 
+
+We generated two tables to compare the fixed and random effects between the full and reduced models. In the first table, we observe that the matched coefficients for initial_ypc, perypc, regtest, and time are nearly identical across both models. All of these predictors remain statistically significant, and their coefficient values differ only slightly. Additionally, in the full model, the two predictors that were omitted in the reduced model—rcdum (rent control) and ajwtr (adjacency to water) are not statistically significant. The second table presents a comparison of the random effects. Here, we observe that the between-MSA variance increased slightly in the reduced model (from 0.02361 to 0.02501), suggesting that removing predictors has modestly increased the amount of unexplained variability at the MSA level. This implies that the two omitted predictors (rent control and adjacency to water) may have explained a small portion of the variation between MSAs, though not enough to be statistically significant. Meanwhile, the residual (within-MSA) variance remains unchanged, indicating that the overall fit within MSAs is stable. Finally, because both models were fit using REML (Restricted Maximum Likelihood), the REML criterion cannot be used to directly compare models with different fixed-effect structures despite the fact that the reduced model has a better (more negative) REML criterion (-605 versus -602). As a result, we proceed by using the Kenward-Roger test to formally compare the two models.
+
+Table Visualizing Contrasting Measurements betwen the Two Models: 
+
+```{r}
+full_summary <- broom.mixed::tidy(full_model, effects = "fixed") %>%
+  mutate(Model = "Full Model")
+
+reduced_summary <- broom.mixed::tidy(reduced_model, effects = "fixed") %>%
+  mutate(Model = "Reduced Model")
+
+coef_table <- bind_rows(full_summary, reduced_summary) %>%
+  dplyr::select(Model, term, estimate, std.error, statistic, p.value) %>%
+  mutate(
+    across(c(estimate, std.error, statistic), ~ round(.x, 4)),
+    p.value = ifelse(p.value < 0.001, "<0.001", round(p.value, 3))
+  )
+
+kable(coef_table, caption = "Comparison of Fixed Effects Between Full and Reduced Models")
+```
+
+
+```{r}
+re_full <- as.data.frame(VarCorr(full_model))
+re_reduced <- as.data.frame(VarCorr(reduced_model))
+
+re_full <- re_full %>%
+  mutate(Model = "Full Model") %>%
+  rename(
+    grp = grp,
+    term = var1,
+    Variance = vcov,
+    Std_Dev = sdcor
+  ) %>%
+  dplyr::select(Model, grp, term, Variance, Std_Dev)
+
+re_reduced <- re_reduced %>%
+  mutate(Model = "Reduced Model") %>%
+  rename(
+    grp = grp,
+    term = var1,
+    Variance = vcov,
+    Std_Dev = sdcor
+  ) %>%
+  dplyr::select(Model, grp, term, Variance, Std_Dev)
+
+
+random_effects_table <- bind_rows(re_full, re_reduced)
+
+random_effects_table <- random_effects_table %>%
+  mutate(
+    Variance = round(Variance, 5),
+    Std_Dev = round(Std_Dev, 5)
+  )
+
+kable(random_effects_table, caption = "Comparison of Random Effects (Variance and Std. Dev) for Full and Reduced Models")
+```
+
+We performed a Kenward-Roger (KR) test to compare the full and reduced models. This test is used to approximate the degrees of freedom when testing fixed effects in linear mixed-effects models. The KR method is particularly valuable because it addresses bias in the estimation of degrees of freedom by adjusting the denominator degrees of freedom to account for the uncertainty introduced by estimating random effects. This adjustment is especially important when the number of clusters (in this case, 36 MSAs) is relatively small or moderate. The results of the test show a p-value of 0.17, which is greater than the conventional significance threshold of 0.05. As a result, we fail to reject the null hypothesis, indicating that there is no statistically significant difference in model fit between the full model and the reduced model that omits the two predictors: rent control (rcdum) and adjacency to water (ajwtr). Therefore, we conclude that the reduced model provides a more parsimonious, yet statistically equivalent, alternative to the full model.
+
+```{r}
+kr_test <- KRmodcomp(full_model, reduced_model)
+summary(kr_test)
+```
+
+7. It is possible that the increase in prices may not be linear in year. Fit an additive mixed model where smooth is added to year. Make a plot to show how prices have increased over time.
+
+**Solution ** 
+We fit an additive mixed model using gam() to allow for the possibility that the increase in housing prices over time is nonlinear. The model includes fixed effects for baseline income (initial_ypc), income growth (perypc), regulatory environment (regtest), rent control (rcdum), and coastal proximity (ajwtr). To capture potential nonlinear time trends, we added a smooth term for time, modeled as a cubic regression spline with five basis functions (k = 5). Additionally, a random intercept for MSA was included using s(msa, bs = "re"), accounting for baseline differences in average housing prices across metropolitan areas. 
+
+From the model output, the smooth term for time has an effective degrees of freedom (edf) of 2.69, which is greater than 1, confirming a nonlinear relationship between time and housing prices. This suggests we should expect to see accelerating or decelerating trends, rather than a constant rate of change over time. The smooth term for msa has an edf of 30.25, which is close to the number of MSAs (36), indicating substantial between-region variability—or equivalently, that nearly all MSAs require unique intercepts to accurately capture baseline differences. Both smooth terms have very small p-values, indicating that both the nonlinear time trend and the regional heterogeneity are statistically significant.
+
+The model’s adjusted R-squared is 0.952, meaning it explains 95.2% of the variance in the response variable (log average housing prices). The deviance explained is 95.8%, and the REML criterion is –305.85. While these values suggest the model fits the data very well and captures nearly all systematic variation, it remains important to check residual diagnostics to ensure that the underlying model assumptions (such as homoscedasticity, normality, independence) are satisfied.
+
+```{r}
+gamm_model <- gam(narsp ~ initial_ypc + perypc + regtest + rcdum + ajwtr + 
+                  s(time, bs = "cr", k = 5) +   
+                  s(msa, bs = "re"),            
+                data = hprice,
+                method = "REML")
+summary(gamm_model)
+```
+
+```{r}
+time_plot <- draw(gamm_model, 
+                 select = "s(time)",  
+                 residuals = TRUE,   
+                 ci_alpha = 0.3,      
+                 rug = TRUE) +       
+  labs(
+    title = "Nonlinear Trend of Housing Prices (1986-1994)",
+    subtitle = "GAMM smooth term with 95% confidence band",
+    x = "Year (Scaled: 1=1986 to 9=1994)", 
+    y = "Effect on log(Price)",
+    caption = paste("Effective df =", round(summary(gamm_model)$s.table["s(time)", "edf"], 2),
+                   "| p < 0.001")
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5, color = "grey40"),
+    panel.grid.minor = element_blank()
+  ) +
+  scale_x_continuous(breaks = seq(-1.5, 1.5, by = 0.5),
+                    labels = function(x) round(mean(hprice$time) + x * sd(hprice$time), 1)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50")
+
+print(time_plot)
+```
+
+8. Interpret the coefficients in the previous model for the initial annual income, growth and regulation predictors.
+
+**Solution ** 
+
+Interpretations of the coefficients from the additive mixed model:
+
+1. Interpretation for initial annual income: 
+
+2. Interpretation for growth: 
+
+3. Interpretation for regulation predictors: 
+
+## Optional Midterm Make-up* 
+
+Rework on your midterm exam. Your final midterm grade will be the average of your original (in class) midterm and this make-up one. 
+
+
+
+
+
+
+
+
