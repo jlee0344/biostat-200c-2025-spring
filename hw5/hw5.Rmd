@@ -1,0 +1,557 @@
+---
+title: "Biostat 200C Homework 5"
+subtitle: Due May 30  @ 11:59PM
+date: today
+format:
+  html:
+    theme: cosmo
+    embed-resources: true
+    number-sections: true
+    toc: true
+    toc-depth: 4
+    toc-location: left
+    code-fold: false
+engine: knitr
+knitr:
+  opts_chunk: 
+    fig.align: 'center'
+    # fig.width: 6
+    # fig.height: 4
+    message: FALSE
+    cache: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = FALSE)
+```
+
+```{r}
+library(faraway)
+library(lme4)      
+library(ggplot2)   
+library(tidyr)    
+library(dplyr)   
+library(gridExtra)
+library(lmerTest) 
+library(emmeans)
+library(pbkrtest)
+library(knitr)
+library(broom)
+library(MASS)
+library(geepack)
+```
+
+
+## Q1. Balanced one-way ANOVA random effects model
+
+
+**Solution ** 
+Solution is written on another document. 
+
+Consider the balanced one-way ANOVA random effects model with $a$ levels and $n$ observations in each level
+$$
+y_{ij} = \mu + \alpha_i + \epsilon_{ij}, \quad i=1,\ldots,a, \quad j=1,\ldots,n.
+$$
+where $\alpha_i$ are iid from $N(0,\sigma_\alpha^2)$, $\epsilon_{ij}$ are iid from $N(0, \sigma_\epsilon^2)$. 
+
+
+1. Derive the ANOVA estimate for $\mu$, $\sigma_\alpha^2$, and $\sigma_{\epsilon}^2$. Specifically show that
+\begin{eqnarray*}
+  \mathbb{E}(\bar y_{\cdot \cdot}) &=& \mathbb{E} \left( \frac{\sum_{ij} y_{ij}}{na} \right) = \mu \\
+  \mathbb{E} (\text{SSE}) &=& \mathbb{E} \left[ \sum_{i=1}^a \sum_{j=1}^n (y_{ij} - \bar{y}_{i \cdot})^2 \right] = a(n-1) \sigma_{\epsilon}^2 \\
+  \mathbb{E} (\text{SSA}) &=& \mathbb{E} \left[ \sum_{i=1}^a \sum_{j=1}^n (\bar{y}_{i \cdot} - \bar{y}_{\cdot \cdot})^2 \right] = (a-1)(n \sigma_{\alpha}^2 + \sigma_{\epsilon}^2),
+\end{eqnarray*}
+which can be solved to obtain ANOVA estimate
+\begin{eqnarray*}
+\widehat{\mu} &=& \frac{\sum_{ij} y_{ij}}{na}, \\
+\widehat{\sigma}_{\epsilon}^2 &=& \frac{\text{SSE}}{a(n-1)}, \\
+\widehat{\sigma}_{\alpha}^2 &=& \frac{\text{SSA}/(a-1) - \widehat{\sigma}_{\epsilon}^2}{n}.
+\end{eqnarray*}
+
+2. Derive the MLE estimate for $\mu$, $\sigma_\alpha^2$, and $\sigma_{\epsilon}^2$. Hint: write down the log-likelihood and find the maximizer.
+
+3. (**Optional**) Derive the REML estimate for $\mu$, $\sigma_\alpha^2$, and $\sigma_{\epsilon}^2$. 
+
+4. For all three estimates, check that your results match those we obtained using R for the `pulp` example in class.
+
+
+## Q2. Estimation of random effects
+
+
+**Solution ** 
+Solution is written on another document. 
+
+1. Assume the conditional distribution
+$$
+\mathbf{y} \mid \boldsymbol{\gamma} \sim N(\mathbf{X} \boldsymbol{\beta} + \mathbf{Z} \boldsymbol{\gamma}, \sigma^2 \mathbf{I}_n)
+$$
+and the prior distribution
+$$
+\boldsymbol{\gamma} \sim N(\mathbf{0}_q, \boldsymbol{\Sigma}).
+$$
+Then by the Bayes theorem, the posterior distribution is
+\begin{eqnarray*}
+f(\boldsymbol{\gamma} \mid \mathbf{y}) &=& \frac{f(\mathbf{y} \mid \boldsymbol{\gamma}) \times f(\boldsymbol{\gamma})}{f(\mathbf{y})}, \end{eqnarray*}
+where $f$ denotes corresponding density. Show that the posterior distribution is a multivariate normal with mean
+$$
+\mathbb{E} (\boldsymbol{\gamma} \mid \mathbf{y}) = \boldsymbol{\Sigma} \mathbf{Z}^T (\mathbf{Z} \boldsymbol{\Sigma} \mathbf{Z}^T + \sigma^2 \mathbf{I})^{-1} (\mathbf{y} - \mathbf{X} \boldsymbol{\beta}).
+$$
+
+2. For the balanced one-way ANOVA random effects model, show that the posterior mean of random effects is always a constant (less than 1) multiplying the corresponding fixed effects estimate.
+
+
+## Q3. ELMR Exercise 11.1 (p251) 
+- **Do not need to work on Bayesian related questions**
+
+The ratdrink data consist of five weekly measurements of body weight for 27 rats. The first 10 rats are on a control treatment while 7 rats have thyroxine added to their drinking water. Ten rats have thiouracil added to their water.
+
+(a) Plot the data showing how weight increases with age on a single panel, taking care to distinguish the three treatment groups. Now create a three-panel plot, one for each group. Discuss what can be seen.
+
+**Solution ** 
+
+```{r}
+data(ratdrink)
+View(ratdrink)
+summary(ratdrink)
+```
+
+Single Panel Plot: 
+
+```{r}
+single_plot <- ggplot(ratdrink, aes(x = weeks, y = wt, group = subject, color = treat)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Rat Weight Growth by Treatment Group (Across 5 Weeks)",
+       x = "Weeks",
+       y = "Weight (grams)",
+       color = "Treatment") +
+  theme_minimal()
+```
+
+
+Three Panel Plot: 
+```{r}
+panel_plot <- ggplot(ratdrink, aes(x = weeks, y = wt, group = subject, color = treat)) +
+  geom_line(show.legend = FALSE) +  
+  geom_point(show.legend = FALSE) + 
+  facet_wrap(~ treat) +
+  labs(title = "Rat Weight Growth by Treatment Group (Across 5 Weeks)",
+       x = "Weeks",
+       y = "Weight (grams)") +
+  theme_minimal()
+```
+
+
+```{r}
+single_plot
+panel_plot
+```
+
+2 sets of plots were generated: The single panel plot showcases the weight growth (in grams) over 5 weeks for all 27 rats distinguished by 3 different colors corresponding to 3 treatment groups (control, thyroxine, and thiouracil). Each line represents an individual rat and they are color coded by the specific treatment type they received in their water. The three panel plot showcases the same information but is separated into three panels, one for each treatment group. The weight growth trajectories for each group are displayed individually and each panel includes lines for individual rats.
+
+We can see that the rats in the control group (red) showed a steady increase in weight over time, with relatively little variability between individuals. This suggests a consistent growth pattern in the absence of any treatment. The rats in the thiouracil group (green) exhibited slower growth compared to the controls, with more noticeable variability across individuals. This may suggest that this specific treatment affects individual rats differently. The rats in the thyroxine treatment group (blue) displayed the most rapid increase in weight, suggesting that thyroxine accelerates growth. There is some variability present within this group as well. Additionally, when observing the facet (three-panel) plot, we can see the individual variation within each treatment group.
+
+
+(b) Fit a linear longitudinal model that allows for a random slope and intercept for each rat. Each group should have a different mean line. Give interpretation for the following estimates:
+
+i. The fixed effect intercept term.
+ii. The interaction between thiouracil and week.
+iii. The intercept random effect SD.
+
+**Solution ** 
+
+```{r}
+model <- lmer(wt ~ treat * weeks + (weeks | subject), data = ratdrink)
+summary(model)
+``` 
+
+Model Commentary: 
+
+We fit a linear longitudinal model to the data, allowing us to examine how rat weight changes over time (weeks) across different treatment groups, while accounting for variability among individual rats. The fixed effects (treat * weeks) test whether the treatment group affects the baseline weight (intercept) and whether it influences the growth rate over time (slope). In other words, the fixed effects assess whether the treatment group impacts the starting weight and the rate of weight gain across weeks, providing one average intercept and slope per treatment group. The random effects (weeks|subject) indicate that each rat has its own unique starting weight (random intercept) and its own growth rate (random slope). This accounts for natural differences between rats—acknowledging that not all rats start at the same weight or grow at the same rate. Although the model does not identify which specific rat is which, it still recognizes and models these individual differences, reflecting that we cannot assume all rats are identical.
+
+Interpretations: 
+
+i. The fixed effect intercept term: 52.8800. This value represents the average starting weight (in grams) at week 0 (at baseline) for rats in the control group. This tells us that, on average, control rats weight about 52.88 grams at the beginning of the study. This is the reference point for comparing other treatment groups. For example: treatthiouracil = 4.78 means thiouracil rats start 4.78 heavier than control rats and treatthyroxine = -0.79 means that thyroxine rats start 0.79 grams lighter than control rats. 
+
+ii. This interaction represents the difference in weekly growth rate for rats treated with thiouracil compared to control rats (how the growth rate or slope of the thiouracil group compares to the control group). The negative value indicates that thiouracil-treated rats gain weight 9.37 grams per week less than control rats, on average, after adjusting for random individual variation and initial group differences. This suggests that thiouracil significantly slows down weight gain. More specifically, from the model summary, we know that control rats gain about 26.48 grams/week (the slope for weeks). The interaction term (treatthiouracil:weeks) indicates that thiouracil-treated rats gain about 26.48 - 9.37 = 17.11 grams/week on average, which is a significant reduction in growth rate compared to control rats. Although the thiouracil group has a positive main effect (+4.78), indicating that these rats started about 4.78 grams heavier than the control rats on average, their growth rate over time is significantly lower than that of the control group.
+
+iii. The intercept random effect SD of 5.70 represents the variability in baseline weights among individual rats, even after accounting for treatment effects. This value indicates that, within any given treatment group, the starting weights of individual rats naturally vary by about ±5.70 grams (one standard deviation) from the group’s average baseline weight (which is 52.88g for controls). This variability reflects inherent biological differences between rats, rather than treatment effects, since it is present even when rats receive the same treatment. This random effects parameter is important to consider because it separates natural differences between rats from the group-level treatment effects. The pretty significant SD value of 5.70 confirms that rats began the study with great differences in starting weight, regardless of their treatment group.
+
+(c) Check whether there is a significant treatment effect.
+
+**Solution ** 
+
+We performed a likelihood ratio test to determine whether adding the treatment effect significantly improves the model’s ability to explain rat weight over time (in weeks). This was done by comparing the full model, which includes the treat * weeks interaction term, with the reduced model, which does not include this interaction and only includes the time effect. The results of the test show a p-value of 4.723e-05 (reject the null hypothesis), indicating that the treatment effect is significant. In other words, the three treatment groups differ in either baseline weight, growth rate, or both. This confirms that the treatment groups significantly influence rat weight gain patterns over time, beyond what can be explained by time alone or random individual differences. Additionally, we see that the AIC and BIC values are lower for the full model (AIC = 915.71) compared to the reduced model (AIC = 932.85), and the log-likelihood value is higher for the full model. These results all support the conclusion that including the treatment effect improves the model’s fit.
+
+```{r}
+model_full <- lmer(wt ~ treat * weeks + (weeks | subject), data = ratdrink, REML = FALSE)
+model_reduced <- lmer(wt ~ weeks + (weeks | subject), data = ratdrink, REML = FALSE)
+anova(model_reduced, model_full)
+```
+
+(d) Construct diagnostic plots showing the residuals against the fitted values and a QQ plot of the residuals. Interpret.
+
+**Solution ** 
+
+We created a residuals versus fitted values plot, which shows that the residuals are fairly evenly scattered around zero across the range of fitted values. There are no obvious patterns or systematic curves, meeting the model’s assumptions of linearity and constant variance (homoscedasticity). However, we do observe a slight spread at the highest fitted values, which could indicate mild heteroscedasticity or potential non-linear effects in these specific ranges. 
+
+In the QQ plot of residuals, the majority of the residuals closely follow the red diagonal line, indicating approximate normality of the residuals. There are some deviations at the extreme ends (tails), suggesting slightly heavier residuals than expected under a normal distribution. Overall, both diagnostic plots suggest that the model’s assumptions are reasonably satisfied, with no major violations of linearity or normality. Therefore, we can support the reliability of the model’s estimates.
+
+```{r}
+residuals <- resid(model_full)
+fitted <- fitted(model_full)
+
+plot1 <- ggplot(data.frame(Fitted = fitted, Residuals = residuals), 
+                aes(x = Fitted, y = Residuals)) +
+  geom_point(alpha = 0.6) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Residuals vs. Fitted Values",
+       x = "Fitted Values", y = "Residuals") +
+  theme_minimal()
+
+plot2 <- ggplot(data.frame(Residuals = residuals), aes(sample = Residuals)) +
+  stat_qq() + 
+  stat_qq_line(color = "red") +
+  labs(title = "QQ Plot of Residuals",
+       x = "Theoretical Quantiles", y = "Sample Quantiles") +
+  theme_minimal()
+
+gridExtra::grid.arrange(plot1, plot2, ncol = 2)
+```
+
+(e) Construct confidence intervals for the parameters of the model. Which random effect terms may not be significant? Is the thyroxine group significantly different from the control group?
+
+**Solution ** 
+We computed the 95% confidence intervals for the model’s parameters, including both the fixed and random effects. In the random effects output, we see that the correlation term (Correlation (Weeks, intercept)) has a 95% confidence interval of [-0.526, 0.379], which includes zero. This suggests that the correlation between the random intercept (the variability in baseline weight across rats) and the random slope (the variability in weight gain over time across rats) is not statistically significant. In other words, there is no strong evidence that the relationship between the intercept and slope varies systematically across rats. However, the standard deviations for the random effects do not include zero in their confidence intervals, indicating they are statistically significant. Specifically: SD of Intercept (subject): 95% CI of [3.45, 7.67], indicating meaningful variability in baseline weight among rats. SD of Weeks (subject): 95% CI of [2.61, 4.87], indicating meaningful variability in weight gain rates across rats. The Residual standard deviation has a 95 percent confidence interval of [3.76, 5.11] which does not include 0 indicating that there is significant unexplained variability in the data beyond what the model accounts for. These results suggest that while there is no clear evidence for a correlation between random intercepts and slopes, there is significant variability in both the starting weight and growth rate among the rats. 
+
+For the fixed effects, our parameter of interest, “Thyroxine Group,” represents the difference in the baseline (week 0) weight between the thyroxine group and the control group. Its 95% confidence interval is [-7.04, 5.46], which includes zero. Therefore, we conclude that the thyroxine group does not have a significantly different baseline weight compared to the control group.
+
+The interaction term (“Thyroxine Group: Weeks”) represents how the slope of weight gain over time differs between the thyroxine group and the control group. Essentially, it tests whether the rate of weight gain per week in the thyroxine group is significantly different from that of the control group. The confidence interval for this term is [-3.12, 4.44], which also includes zero. Consequently, we conclude that the effect of thyroxine on weight gain over time (the growth rate) is not significantly different from the control group.
+
+```{r}
+ci <- confint(model_full, oldNames = FALSE)
+
+ci_df <- data.frame(Parameter = rownames(ci), Lower = ci[, 1], Upper = ci[, 2], row.names = NULL)
+
+ci_df$Parameter <- gsub("sd_\\(Intercept\\)\\|subject", "SD of Intercept (subject)", ci_df$Parameter)
+ci_df$Parameter <- gsub("cor_weeks\\.\\(Intercept\\)\\|subject", "Correlation (Weeks, intercept)", ci_df$Parameter)
+ci_df$Parameter <- gsub("sd_weeks\\|subject", "SD of Weeks (subject)", ci_df$Parameter)
+ci_df$Parameter <- gsub("sigma", "Residual SD (sigma)", ci_df$Parameter)
+ci_df$Parameter <- gsub("\\(Intercept\\)", "Intercept", ci_df$Parameter)
+ci_df$Parameter <- gsub("treatthiouracil", "Thiouracil Group", ci_df$Parameter)
+ci_df$Parameter <- gsub("treatthyroxine", "Thyroxine Group", ci_df$Parameter)
+ci_df$Parameter <- gsub("weeks", "Weeks", ci_df$Parameter)
+
+random_effects <- ci_df %>%
+  filter(grepl("SD|Correlation|Residual", Parameter))
+
+fixed_effects <- ci_df %>%
+  filter(!grepl("SD|Correlation|Residual", Parameter))
+
+cat("Random Effects\n")
+kable(random_effects, digits = 2, col.names = c("Parameter", "Lower 95% CI", "Upper 95% CI"), row.names = FALSE)
+
+cat("Fixed Effects\n")
+kable(fixed_effects, digits = 2, col.names = c("Parameter", "Lower 95% CI", "Upper 95% CI"), row.names = FALSE)
+
+```
+
+## Q4. ELMR Exercise 13.1 (p295): MIXED EFFECT MODELS FOR NONNORMAL RESPONSES: **Do not need to work on Bayesian related questions**
+
+The ohio data concern 536 children from Steubenville, Ohio and were taken as part of a study on the effects of air pollution. Children were in the study for 4 years from ages 7 to 10. The response was whether they wheezed or not. The variables are:
+
+1. resp an indicator of wheeze status (1 = yes, 0 = no)
+2 id an identifier for the child
+3. age 7 yrs =−2, 8 yrs =−1, 9 yrs = 0, 10 yrs = 1
+4. smoke an indicator of maternal smoking at the first year of the study (1 = smoker, 0 = nonsmoker)
+
+```{r}
+data(ohio)
+head(ohio)
+str(ohio)
+View(ohio)
+```
+
+(a) Do any of the mothers in the study change their smoking status during the period of observation?
+
+**Solution ** 
+
+No, none of the mothers in the study changed their smoking status during the period of observation (across the 4 years of the study). To confirm this, we first grouped the data by child ID. For each child (identified by their ID), we counted the number of unique smoking statuses (smoke). If any child had more than one unique smoking status, this would have indicated a change in the mother’s smoking status during the study period. However, in this dataset, each mother had a consistent smoking status throughout the 4 years.
+
+```{r}
+smoking_status_change <- ohio %>%
+  group_by(id) %>%
+  summarise(num_unique_smoke = n_distinct(smoke))
+
+changed_mothers <- smoking_status_change %>%
+  filter(num_unique_smoke > 1)
+num_changed_mothers <- nrow(changed_mothers)
+print(paste("Number of mothers who changed smoking status across 4 Years of Study:", num_changed_mothers))
+```
+
+
+(b) Construct a table that shows proportion of children who wheeze for 0, 1, 2, 3 or 4 years broken down by maternal smoking status.
+
+**Solution ** 
+The table of proportions and counts of children who wheezed for 0, 1, 2, 3, or 4 years is broken down by maternal smoking status. The data reveal that most children never wheezed at all, regardless of maternal smoking status. Specifically, among nonsmokers, 67.6% of children never wheezed, and among smokers, 63.1% of children never wheezed. For children who wheezed for only 1 year, the proportions are quite similar between the two groups: 18.6% among nonsmokers and 17.1% among smokers. However, the proportions of children who wheezed for 2, 3, or 4 years are consistently higher among children whose mothers smoked. Among nonsmokers, 7.1% of children wheezed for 2 years, compared to 10.2% among smokers. For 3 years of wheezing, 3.4% of children of nonsmokers wheezed, while 5.9% of children of smokers did. Finally, for children who wheezed for all 4 years, 3.1% were from nonsmoking mothers and 3.7% from smoking mothers. Overall, while the majority of children in both groups never wheezed, there is a slight increase in the proportion of children who had more persistent wheezing (2+ years) among those whose mothers smoked than those whose mothers did not smoke. 
+
+```{r}
+wheeze_counts <- ohio %>%
+  group_by(id, smoke) %>%
+  summarize(years_wheeze = sum(resp), .groups = 'drop')
+
+wheeze_table <- wheeze_counts %>%
+  group_by(smoke, years_wheeze) %>%
+  tally() %>%
+  group_by(smoke) %>%
+  mutate(proportion = n / sum(n)) %>%
+  ungroup() %>%
+  complete(smoke, years_wheeze = 0:4, fill = list(n = 0, proportion = 0)) %>%
+  # FIX: use `dplyr::select` explicitly with `.data =`
+  dplyr::select(smoke, years_wheeze, n, proportion) %>%
+  arrange(smoke, years_wheeze)
+
+final_table <- wheeze_table %>%
+  mutate(
+    smoke = ifelse(smoke == 1, "Smoker", "Non-smoker"),
+    years_wheeze = factor(years_wheeze, levels = 0:4),
+    proportion = round(proportion, 3)
+  ) %>%
+  pivot_wider(
+    id_cols = years_wheeze,
+    names_from = smoke,
+    values_from = c(n, proportion),
+    names_glue = "{smoke}_{.value}"
+  )
+
+knitr::kable(final_table,
+              col.names = c("Years with wheeze",
+                            "Non-smoker (Count)", "Smoker (Count)",
+                            "Non-smoker (Proportion)", "Smoker (Proportion)"),
+              caption = "Wheeze frequency by maternal smoking status")
+
+```
+
+
+(c) Make plot which shows how the proportion of children wheezing changes by age with a separate line for smoking and nonsmoking mothers.
+
+**Solution ** 
+
+The graph below showcases the proportion of children wheezing at each age (7,8,9,10 years old), with separate lines for children of smoking (orange) and non-smoking (blue) mothers. We are able to see from the plot below that the proportion of wheezing children increases then decreases in children whose mothers smoked. In other words, children of smoking mothers have a higher wheezer proportion at each age (7,8,9,10 years old) compared to children of nonsmoking mothers. The highest proportion of wheezing is at age 8, around 22 percent. However, after the age of 8 years old, the wheezing proportion of children whose mother smokes decreases but still remains higher than the non-smoking group. In addition, we are able to see that for children of nonsmoking mothers, the wheezing proportion gradually decreases from about 16 percent at age 7 to around 12 percent at age 10. 
+
+```{r}
+age_wheeze <- ohio %>%
+  group_by(age, smoke) %>%
+  summarize(
+    wheeze_prop = mean(resp),
+    .groups = 'drop'
+  ) %>%
+  mutate(
+    smoke = factor(smoke, levels = c(0, 1), labels = c("Non-smoking", "Smoking"))
+  )
+
+ggplot(age_wheeze, aes(x = age, y = wheeze_prop, color = smoke, group = smoke)) +
+  geom_line(linewidth = 1) +  
+  scale_x_continuous(
+    breaks = c(-2, -1, 0, 1),
+    labels = c("7 years old", "8 years old", "9 years old", "10 years old")
+  ) +
+  scale_y_continuous(
+    labels = scales::percent_format(accuracy = 1),
+    limits = c(0, NA)
+  ) +
+  scale_color_manual(values = c("#1f77b4", "#ff7f0e")) + 
+  labs(
+    title = "Proportion of Children Wheezing by Age",
+    subtitle = "Stratified by maternal smoking status",
+    x = "Age",
+    y = "Proportion Wheezing",
+    color = "Maternal Smoking"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
+```
+
+(d) Group the data by child to count the total (out of four) years of wheezing. Fit a binomial GLM to this response to check for a maternal smoking effect. Does this prove there is a smoking effect or could there be another plausible explanation?
+
+**Solution ** 
+We first grouped the data by each child (identified by a unique ID) and their mother’s smoking status, then calculated the total number of years (out of four) that each child wheezed. We then fit a generalized linear model (GLM) with a binomial distribution to evaluate whether maternal smoking status predicts wheezing. The response variable was specified using cbind(total_wheeze, 4 - total_wheeze), where total_wheeze represents the number of years the child wheezed (successes) and 4 - total_wheeze represents the years without wheezing (failures). Treating wheezing as a binary outcome for each year (four trials per child), we used maternal smoking status (smoke) as the predictor variable. The model’s summary shows that the coefficient for the smoke variable is 0.27156, indicating that the log-odds of wheezing increase by 0.27156 for children of smoking mothers compared to children of non-smoking mothers. This translates to an odds ratio of about exp(0.27156) = 1.312, meaning the odds of wheezing are approximately 31.2% higher for children of smokers. The smoke variable’s p-value is 0.0277, suggesting the association is statistically significant at the 5% level. While the residual deviance decreased slightly from 1045.3 to 1040.5 after including the smoking predictor, this small reduction suggests only a modest effect of maternal smoking on wheezing.
+
+However, this result alone does not prove that there is a smoking effect, because while the model shows a statistically significant association, it does not establish causation. This is due to the fact that the study is observational rather than a randomized controlled trial, where mothers would be randomly assigned to either the smoking or non-smoking group. As a result, we cannot rule out the possibility of confounding factors that could explain the observed association between maternal smoking and wheezing. Other factors, such as smoking by other adults in the household or environmental exposures, may co-occur with maternal smoking and contribute to the relationship. Socioeconomic status is another important confounder, as lower income or education could lead to poorer housing conditions (e.g., mold or air pollution) that independently increase children’s risk of wheezing, regardless of maternal smoking. While randomized controlled trials could help establish causality, they are neither ethical nor feasible in this context. Furthermore, this result alone does not guarantee temporality — that is, that maternal smoking occurred before the onset of wheezing in children. A child may have already developed a respiratory condition before the mother began smoking, making it difficult to definitively conclude that maternal smoking causes wheezing.
+
+
+```{r}
+child_data <- ohio %>%
+  group_by(id, smoke) %>%
+  summarize(total_wheeze = sum(resp),
+            .groups = 'drop')
+
+model <- glm(cbind(total_wheeze, 4 - total_wheeze) ~ smoke,
+             family = binomial,
+             data = child_data)
+
+summary(model)
+```
+
+(e) Fit a model for each individual response using a GLMM fit using penalized quasi-likelihood. Describe the effects of age and maternal smoking. How do the odds of wheezing change numerically over time?
+
+**Solution ** 
+
+We first converted the numeric age variable into a categorical factor with descriptive labels for each year of age (7–10 years), allowing the model to treat each age as a distinct category rather than as a continuous variable. This is because we assume non-linear effects across ages. Next, we fit a Generalized Linear Mixed Model (GLMM) using penalized quasi-likelihood to examine the effects of age and maternal smoking on wheezing. In this model, wheezing status (resp) was modeled as a binary outcome (1 = wheezing, 0 = not wheezing). The model included fixed effects for age and maternal smoking status, capturing the average differences in the log-odds of wheezing across age groups and maternal smoking categories, as well as a random intercept for each child to account for repeated measures and allow for child-specific baseline risks.
+
+1. Age Effects: The results indicate that at age 10, children had significantly lower odds of wheezing compared to the baseline group of 7-year-olds. Specifically, the log-odds of wheezing at age 10 were 0.596 lower than at age 7. This translates to a 44.9% reduction in the odds of wheezing at age 10 compared to age 7, holding other factors constant. In contrast, the odds of wheezing at ages 8 and 9 did not differ significantly from age 7, as indicated by their p-values above 0.05.
+
+2. Maternal Smoking Effect: Maternal smoking was associated with a modest increase in the log-odds of wheezing (coefficient = 0.326), corresponding to a 39% higher odds of wheezing for children of smoking mothers compared to non-smoking mothers. However, this effect was not statistically significant (p-value = 0.1605).
+
+Numerical Change in Wheezing Odds Over Time: While no significant change occurs between ages 7 and 9 (age 8 OR=1.09, p=0.51; age 9 OR=0.96, p=0.74), children experience a significant 45% reduction in wheezing odds by age 10 (OR=0.55, p<0.001) compared to baseline at age 7. Overall, these results suggest that while the odds of wheezing remain steady between ages 7 and 9, they decline significantly by age 10. Maternal smoking shows a modest, though not statistically significant, increase in the odds of wheezing across all ages.
+
+```{r}
+ohio$age_factor <- factor(ohio$age, levels = c(-2, -1, 0, 1), 
+                          labels = c("7yrs", "8yrs", "9yrs", "10yrs"))
+model_pql <- glmmPQL(resp ~ age_factor + smoke, 
+                     random = ~ 1 | id, 
+                     family = binomial,
+                     data = ohio)
+summary(model_pql)
+```
+
+```{r}
+exp(fixef(model_pql)) 
+```
+
+(f) Now fit the same model but using adaptive Gaussian-Hermit quadrature. Compare to the previous model fit.
+
+**Solution ** 
+We fit the same model but using adaptive Gaussian-Hermit quadrature. 
+
+```{r}
+model_AGHQ <- glmer(resp ~ age_factor + smoke + (1 | id),
+                    family = binomial,
+                    data = ohio,
+                    nAGQ = 10)
+summary(model_AGHQ)
+```
+
+Comparing the model fits: 
+
+```{r}
+cat("Fixed effects - PQL Model:\n")
+print(summary(model_pql)$tTable)
+
+cat("\nFixed effects - AGHQ Model:\n")
+summary(model_AGHQ)$coefficients 
+
+cat("\nRandom effects variance - PQL Model:\n")
+print(VarCorr(model_pql))
+
+cat("\nRandom effects variance - AGHQ Model:\n")
+print(VarCorr(model_AGHQ), comp="Variance")
+```
+
+Observations on Differences between Model Fits: 
+
+1. Fixed Effects Differences
+(a) Intercept: The intercept for the PQL model is -2.55, while for the AGHQ model it is -2.88. This suggests that the AGHQ model estimates a lower baseline odds of wheezing, providing a more conservative baseline estimate.
+
+(b) Age Effects: Both models consistently show that children aged 10 have significantly lower odds of wheezing compared to those aged 7 (PQL: -0.60; AGHQ: -0.58). The estimated effects for children aged 8 and 9 are nearly identical across models (PQL: ~0.09 / -0.04; AGHQ: ~0.08 / -0.04), indicating no significant difference in wheezing odds for these ages compared to 7-year-olds.
+
+(c) Smoking Effect: The estimated odds ratio for maternal smoking is approximately 1.38 (exp(0.326)) in the PQL model (p-value = 0.16) and 1.49 (exp(0.399)) in the AGHQ model (p-value = 0.14). Both models suggest a positive but non-significant effect of maternal smoking on wheezing odds, with the AGHQ model indicating a slightly stronger (though still non-significant) smoking effect.
+
+2. Random Effects Variance
+(a) Between-child variability: The variance of the random intercept for the PQL model is 4.27 (SD = 2.07), while for the AGHQ model it is 4.67 (SD = 2.16). This suggests that the AGHQ model captures slightly greater variability between children, reflecting the tendency of PQL to underestimate variance components.
+
+Overall Conclusion: 
+The AGHQ model appears more accurate, producing slightly larger estimated effects for the intercept and smoking, as well as higher random effects variance. It also results in more precise standard errors and provides valid model comparison metrics such as AIC and BIC. In contrast, the PQL model approximates the likelihood and often underestimates standard errors, making it less reliable for inference. Despite these differences, both models agree on the key findings: no significant effect of age for children aged 8 or 9, a significant reduction in wheezing odds at age 10, and a non-significant but positive effect of maternal smoking on wheezing.
+
+(i) Fit the model using GEE. Use an autoregressive rather than exchangeable error structure. Compare the results to the previous model fits. In your model, what indicates that a child who already wheezes is likely to continue to wheeze?
+
+**Solution ** 
+
+We fit the model using GEE with an autoregressive (AR-1) correlation structure instead of an exchangeable structure. The estimated AR-1 correlation parameter (alpha = 0.4896) represents the correlation between a child’s wheezing measurements at consecutive time points. This positive value of 0.49 indicates that if a child wheezes at one age, they have a moderately high probability of wheezing again at the next age (consecutive ages such as from age 8 to age 9). The moderately strong positive correlation means that if a child wheezes at age 8, the probability of wheezing at age 9 is higher than if they had not wheezed at age 8. Unlike the exchangeable structure, which assumes that all time points are equally correlated, the AR-1 structure assumes that measurements closer in time (like ages 8 and 9) are more strongly correlated than those further apart (like ages 8 and 10). This fits well with the nature of wheezing, where recent history is more predictive than more distant history.
+
+Comparison with Previous Model Fits:
+
+1. Intercept: The intercept in the GEE_AR1 model is -1.73220, which is less negative than those in the AGHQ and PQL models. This suggests a higher baseline probability of wheezing in the GEE model. In other words, accounting for within-child correlation in GEE reveals a slightly higher baseline risk of wheezing compared to AGHQ and PQL.
+2.Age Effects (Age 8 years): The coefficient for age 8 in GEE is 0.05399, representing a slight increase in the log odds of wheezing at age 8 compared to age 7, adjusting for smoking and within-child correlation. However, this increase is smaller in GEE than in the AGHQ and PQL models, suggesting that accounting for autocorrelation reduces the apparent age effect. This effect is not significant across all three models as the p-value for this coefficient is large. 
+3. Age Effects (Age 9 years): The coefficient for age 9 in GEE is -0.0277, indicating a small decrease in the log odds of wheezing compared to age 7. Again, this effect is less negative in GEE, reflecting that accounting for the autocorrelation diminishes the apparent difference between ages 9 and 7.
+4. Age Effects (Age 10 years): Age 10 shows a significant negative effect across all models, but it is smaller in magnitude in GEE (-0.3754). This suggests that although children are less likely to wheeze at age 10, this decline is less pronounced in GEE after accounting for correlated repeated measurements.
+5. Effect of Smoking: The maternal smoking effect is consistently positive across all models, but it is smaller in GEE (0.2420). This indicates that GEE attributes less of the variation in wheezing to smoking exposure once it adjusts for the within-child correlation in repeated measurements.
+
+Overall, we can conclude that the GEE model generally produces smaller magnitude coefficients for predictors than AGHQ and PQL. This is because GEE explicitly accounts for the within-child autocorrelation (via the AR-1 structure), which reduces the apparent impact of predictors like age and smoking. In contrast, AGHQ and PQL do not fully adjust for these correlations and therefore tend to inflate the estimated effects.
+
+```{r}
+model_gee <- geeglm(resp ~ age_factor + smoke,
+                    id = id,
+                    family = binomial,
+                    data = ohio,
+                    corstr = "ar1",
+                    waves = age)  
+summary(model_gee)
+```
+Comparing the Three Models:  
+
+```{r}
+alpha <- model_gee$geese$alpha  
+gee_effects <- coef(summary(model_gee))
+
+comparison <- data.frame(
+  Term = c("Intercept", "Age8", "Age9", "Age10", "Smoke"),
+  GEE_AR1 = gee_effects[, "Estimate"],
+  AGHQ = fixef(model_AGHQ),
+  PQL = fixef(model_pql)
+)
+print(comparison)
+```
+
+
+```{r}
+cat("\nAutoregressive (AR-1) correlation parameter:\n")
+print(summary(model_gee)$corr)
+```
+
+**Comparing the GEE_AR1, AGHQ, and PQL models: ** 
+
+```{r}
+comparison <- data.frame(
+  Term = c("Intercept", "Age8", "Age9", "Age10", "Smoke"),
+  GEE_AR1 = gee_effects[, "Estimate"],
+  AGHQ = fixef(model_AGHQ),
+  PQL = fixef(model_pql)
+)
+print(comparison)
+```
+
+(j) What is your overall conclusion regarding the effect of age and maternal smoking? Can we trust the GLM result or are the GLMM models preferable?
+
+**Solution ** 
+
+My overall conclusion regarding the effect of age and maternal smoking are as follows: 
+
+1. Age Effects: For ages 8 and 9, we can conclude that there are no significant changes in the odds of wheezing across all models (p-values > 0.05). This indicates that children aged 8 and 9 have similar odds of wheezing as those aged 7. At age 10, however, there is a significant reduction in wheezing odds (p-value < 0.05), though the magnitude of this reduction varies across models. In the GEE (AR-1) model, the coefficient for age 10 is -0.38, indicating that the log odds of wheezing at age 10 are 0.38 lower than at age 7. In the GLMMs (AGHQ/PQL) models, the coefficients range from -0.58 to -0.60, suggesting a larger decline in wheezing odds compared to the GEE model. Thus, we can conclude that wheezing decreases by age 10, but the decline appears more gradual in the GEE model, likely due to the adjustment for temporal dependence (AR-1 correlation).
+2. Maternal Smoking Effects: The effect of maternal smoking is consistently positive across all models, indicating that children of smoking mothers have higher odds of wheezing than those of non-smoking mothers. However, this effect is not statistically significant in any of the models (p-values range between 0.14–0.19). The effect size is smallest in the GEE model (0.24), providing the most conservative estimate compared to the AGHQ (0.40) and PQL (0.33) models.
+
+Simple GLMs treat repeated measures as independent, which can result in biased standard error estimates and inflated Type I error rates (false positives). They also cannot separate between-child variability (such as genetic differences) from the effects of predictors, and they fail to capture the persistence of wheezing, which is a limitation that the GEE model overcomes by estimating an AR-1 correlation of 0.49. For example, although the simple GLM showed a significant maternal smoking effect (p = 0.027), this effect disappeared in the GLMM and GEE models (p > 0.05), suggesting that the GLM result is likely misleading. GLMs also do not account for within-child correlation, which can overstate the significance of predictor effects. In conclusion, for rigorous research and clinical decision-making, it is most appropriate to use GLMMs (such as AGHQ) to formally test the effects of age and maternal smoking, while GEE (with AR-1) is valuable for describing population-level wheezing patterns, particularly the persistence of wheezing over time. The GEE model provides more conservative coefficient estimates, whereas the simple GLM results are not statistically valid for repeated measures data.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
