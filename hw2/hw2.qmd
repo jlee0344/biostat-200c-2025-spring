@@ -52,8 +52,8 @@ library(tidyverse)
 library(dplyr) 
 library(car)
 library(tibble) 
-library(MASS)
 library(glmnet)
+library(MASS)
 ```
 
 Read in the data of COVID-19 cases reported on 2020-04-04.
@@ -73,7 +73,7 @@ Sanity check by displaying the unique US states and territories:
 
 ```{r}
 county_count %>%
-  select(province_state) %>%
+  dplyr::select(province_state) %>%
   distinct() %>%
   arrange(province_state) %>%
   print(n = Inf)
@@ -105,9 +105,8 @@ Read in the 2020 county-level health ranking data.
 ```{r}
 county_info <- read_csv("~/Downloads/us-county-health-rankings-2020.csv.gz") %>%
   filter(!is.na(county)) %>%
-  # cast fips into dbl for use as a key for joining tables
   mutate(fips = as.numeric(fips)) %>%
-  select(fips, 
+  dplyr::select(fips, 
          state,
          county,
          percent_fair_or_poor_health, 
@@ -178,7 +177,7 @@ We found there are some rows that miss `fips`.
 ```{r}
 county_count %>%
   filter(is.na(fips)) %>%
-  select(fips, admin2, province_state) %>%
+  dplyr::select(fips, admin2, province_state) %>%
   print(n = Inf)
 ```
 We need to (1) manually set the `fips` for some counties, (2) discard those `Unassigned`, `unassigned` or `Out of`, and (3) try to join with `county_info` again.
@@ -214,15 +213,15 @@ If there are variables with missing value for many counties, we go back and remo
 Let's create a final data frame for analysis.
 ```{r}
 county_data <- county_data %>%
-  mutate(state = as.factor(state)) %>%
-  select(county, confirmed, deaths, state, percent_fair_or_poor_health:percent_rural)
+  dplyr::mutate(state = as.factor(state)) %>%
+  dplyr::select(county, confirmed, deaths, state, percent_fair_or_poor_health:percent_rural)
 summary(county_data)
 ```
 Display the 10 counties with highest CFR.
 ```{r}
 county_data %>%
-  mutate(cfr = deaths / confirmed) %>%
-  select(county, state, confirmed, deaths, cfr) %>%
+  dplyr::mutate(cfr = deaths / confirmed) %>%
+  dplyr::select(county, state, confirmed, deaths, cfr) %>%
   arrange(desc(cfr)) %>%
   top_n(10)
 ```
